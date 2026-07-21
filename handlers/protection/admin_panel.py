@@ -260,7 +260,7 @@ async def cmd_adminlist(message: Message) -> None:
 
 @router.message(F.text.in_({"Повысить", "повысить", "ПОВЫСИТЬ"}), F.reply_to_message, IsGroup(), HasRank(3))
 async def text_addadmin(message: Message) -> None:
-    """Reply with 'Повысить' to promote a user to junior admin (rank 1)."""
+    """Reply with 'Повысить' to promote a user by one rank (max 3)."""
     target = message.reply_to_message.from_user
     if target is None or target.is_bot:
         await message.answer("Нельзя назначить бота.")
@@ -270,10 +270,13 @@ async def text_addadmin(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         admin_user = await get_or_create_user(session, telegram_id=message.from_user.id)
         target_user = await get_or_create_user(session, telegram_id=target.id)
-        await add_chat_admin(session, chat.id, target_user.id, admin_user.id, rank=1)
+        current_rank = await get_chat_admin_rank(session, chat.id, target_user.id) or 0
+        new_rank = min(current_rank + 1, 3)
+        await add_chat_admin(session, chat.id, target_user.id, admin_user.id, rank=new_rank)
 
     name = target.first_name or str(target.id)
-    await message.answer(f"✅ <b>{name}</b> назначен — 🔰 Младший")
+    rank_label = f"{_RANK_EMOJI[new_rank]} {_RANK_NAMES[new_rank]}"
+    await message.answer(f"✅ <b>{name}</b> назначен — {rank_label}")
 
 
 @router.message(F.text.in_({"Понизить", "понизить", "ПОНИЗИТЬ"}), F.reply_to_message, IsGroup(), HasRank(3))
