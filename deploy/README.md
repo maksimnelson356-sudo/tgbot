@@ -51,7 +51,7 @@ cd /opt/tgbot && bash deploy/deploy.sh
 ## Структура
 
 ```
-/opt/tgbot/
+/root/tgbot/
 ├── bot.py
 ├── deploy/
 │   ├── deploy.sh           # Скрипт деплоя

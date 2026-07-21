@@ -5,8 +5,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/tgbot
-ExecStart=/opt/tgbot/venv/bin/python bot.py
+WorkingDirectory=/root/tgbot
+ExecStart=/root/tgbot/venv/bin/python bot.py
 Restart=always
 RestartSec=10
 
