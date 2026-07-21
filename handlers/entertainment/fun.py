@@ -154,10 +154,12 @@ _HUG_GIF = "https://i.pinimg.com/originals/7b/73/4e/7b734ed8ced0bb4bd7964bb7f733
 
 
 def _user_name(user) -> str:
-    """Return display name for a user."""
+    """Return display name for a user — prefer first_name."""
+    if user.first_name:
+        return f"<b>{user.first_name}</b>"
     if user.username:
         return f"@{user.username}"
-    return f"<b>{user.first_name or 'Unknown'}</b>"
+    return "Unknown"
 
 
 @router.message(Command("hug"))
