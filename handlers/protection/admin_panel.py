@@ -256,54 +256,24 @@ async def cmd_adminlist(message: Message) -> None:
     await message.answer("\n".join(lines))
 
 
-# ── "Назначить" / "Понизить" / "Кто админ" — text commands ────────────────────
+# ── "Повысить" / "Понизить" / "Кто админ" — text commands ────────────────────
 
-@router.message(F.text.in_({"Назначить", "назначить", "НАЗНАЧИТЬ"}), F.reply_to_message, IsGroup(), HasRank(3))
+@router.message(F.text.in_({"Повысить", "повысить", "ПОВЫСИТЬ"}), F.reply_to_message, IsGroup(), HasRank(3))
 async def text_addadmin(message: Message) -> None:
-    """Reply with 'Назначить' to promote a user — shows rank selection."""
+    """Reply with 'Повысить' to promote a user to junior admin (rank 1)."""
     target = message.reply_to_message.from_user
     if target is None or target.is_bot:
         await message.answer("Нельзя назначить бота.")
         return
 
-    # Show inline keyboard for rank selection
-    builder = InlineKeyboardBuilder()
-    builder.button(text="🔰 Младший (1)", callback_data=f"setrank:{target.id}:1")
-    builder.button(text="🛡️ Администратор (2)", callback_data=f"setrank:{target.id}:2")
-    builder.button(text="👑 Главный (3)", callback_data=f"setrank:{target.id}:3")
-    builder.adjust(1)
-    await message.answer(f"Выбери ранг для <b>{target.first_name or target.id}</b>:", reply_markup=builder.as_markup())
-
-
-@router.callback_query(F.data.startswith("setrank:"))
-async def setrank_callback(callback: CallbackQuery) -> None:
-    """Handle rank selection for new admin."""
-    if callback.from_user is None or callback.message is None:
-        return
-    if callback.message.chat.type not in ("group", "supergroup"):
-        await callback.answer()
-        return
-
-    _, target_id, rank_str = callback.data.split(":")
-    target_id = int(target_id)
-    rank = int(rank_str)
-
-    # Verify the person who clicked is still rank 3
-    if not await _check_admin_access(callback.message.chat, callback.from_user.id):
-        await callback.answer("Нет доступа!", show_alert=True)
-        return
-
     async with async_session_factory() as session:
-        chat = await get_or_create_chat(session, telegram_id=callback.message.chat.id)
-        admin_user = await get_or_create_user(session, telegram_id=callback.from_user.id)
-        target_user = await get_or_create_user(session, telegram_id=target_id)
-        await add_chat_admin(session, chat.id, target_user.id, admin_user.id, rank=rank)
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        admin_user = await get_or_create_user(session, telegram_id=message.from_user.id)
+        target_user = await get_or_create_user(session, telegram_id=target.id)
+        await add_chat_admin(session, chat.id, target_user.id, admin_user.id, rank=1)
 
-    rank_label = f"{_RANK_EMOJI[rank]} {_RANK_NAMES[rank]}"
-    await callback.message.edit_text(
-        f"✅ <b>{target_user.first_name or target_id}</b> назначен — {rank_label}"
-    )
-    await callback.answer()
+    name = target.first_name or str(target.id)
+    await message.answer(f"✅ <b>{name}</b> назначен — 🔰 Младший")
 
 
 @router.message(F.text.in_({"Понизить", "понизить", "ПОНИЗИТЬ"}), F.reply_to_message, IsGroup(), HasRank(3))

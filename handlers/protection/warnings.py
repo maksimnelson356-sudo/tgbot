@@ -2,7 +2,7 @@ import re
 
 import datetime
 
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import ChatPermissions, Message
 
@@ -58,17 +58,14 @@ def _format_duration(seconds: int) -> str:
     return f"{seconds}s"
 
 
-@router.message(Command("warn"), IsGroup(), HasRank(1))
-async def cmd_warn(message: Message) -> None:
+async def _do_warn(message: Message, reason: str = "No reason provided") -> None:
+    """Shared warn logic for /warn command and 'Пред' text command."""
     lang = await get_user_lang(message)
     if message.reply_to_message is None or message.reply_to_message.from_user is None:
         await message.answer(t("warn_no_reply", lang))
         return
 
     target = message.reply_to_message.from_user
-    reason = message.text.removeprefix("/warn").strip()
-    if not reason:
-        reason = "No reason provided"
 
     async with async_session_factory() as session:
         user = await get_or_create_user(session, telegram_id=target.id)
@@ -85,6 +82,76 @@ async def cmd_warn(message: Message) -> None:
         if warn_count >= 3:
             await mute_member(session, chat.id, user.id, 3600)
             await message.answer(t("warn_auto_muted", lang, user=mention))
+
+
+async def _do_mute(message: Message, args: str = "") -> None:
+    """Shared mute logic for /mute command and 'Мут' text command."""
+    lang = await get_user_lang(message)
+    if message.reply_to_message is None or message.reply_to_message.from_user is None:
+        await message.answer(t("mute_no_reply", lang))
+        return
+
+    target = message.reply_to_message.from_user
+    duration = 3600
+    reason = "No reason"
+    if args:
+        parts = args.split(maxsplit=1)
+        duration = _parse_duration(parts[0])
+        if len(parts) > 1:
+            reason = parts[1]
+
+    async with async_session_factory() as session:
+        user = await get_or_create_user(session, telegram_id=target.id)
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        await mute_member(session, chat.id, user.id, duration)
+        await log_action(session, message.chat.id, target.id, "muted", admin_id=message.from_user.id, details=f"{duration}s: {reason}")
+
+    try:
+        until_date = datetime.datetime.now() + datetime.timedelta(seconds=duration)
+        await message.bot.restrict_chat_member(
+            chat_id=message.chat.id,
+            user_id=target.id,
+            permissions=ChatPermissions(can_send_messages=False),
+            until_date=until_date,
+        )
+    except Exception as e:
+        await message.answer(f"⚠️ Cannot restrict: {e}. Make bot admin!")
+
+    await message.answer(t("mute_message", lang, user=get_user_mention(target), duration=_format_duration(duration), reason=reason))
+
+
+async def _do_ban(message: Message, reason: str = "No reason") -> None:
+    """Shared ban logic for /ban command and 'Бан' text command."""
+    lang = await get_user_lang(message)
+    if message.reply_to_message is None or message.reply_to_message.from_user is None:
+        await message.answer("Ответь на сообщение пользователя, чтобы забанить.")
+        return
+
+    target = message.reply_to_message.from_user
+
+    try:
+        await message.bot.ban_chat_member(
+            chat_id=message.chat.id,
+            user_id=target.id,
+        )
+    except Exception as e:
+        await message.answer(f"⚠️ Cannot ban: {e}. Make bot admin!")
+        return
+
+    mention = get_user_mention(target)
+    await message.answer(f"🔨 <b>{mention}</b> забанен. Причина: {reason}")
+
+    async with async_session_factory() as session:
+        await log_action(
+            session, message.chat.id, target.id, "banned",
+            admin_id=message.from_user.id, details=reason,
+        )
+
+
+@router.message(Command("warn"), IsGroup(), HasRank(1))
+async def cmd_warn(message: Message) -> None:
+    reason = message.text.removeprefix("/warn").strip() or "No reason provided"
+    await _do_warn(message, reason)
 
 
 @router.message(Command("unwarn"), IsGroup(), HasRank(1))
@@ -119,40 +186,8 @@ async def cmd_unwarn(message: Message) -> None:
 
 @router.message(Command("mute"), IsGroup(), HasRank(1))
 async def cmd_mute(message: Message) -> None:
-    lang = await get_user_lang(message)
-    if message.reply_to_message is None or message.reply_to_message.from_user is None:
-        await message.answer(t("mute_no_reply", lang))
-        return
-
-    target = message.reply_to_message.from_user
     args = message.text.removeprefix("/mute").strip()
-    duration = 3600
-    reason = "No reason"
-    if args:
-        parts = args.split(maxsplit=1)
-        duration = _parse_duration(parts[0])
-        if len(parts) > 1:
-            reason = parts[1]
-
-    async with async_session_factory() as session:
-        user = await get_or_create_user(session, telegram_id=target.id)
-        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
-        await mute_member(session, chat.id, user.id, duration)
-        await log_action(session, message.chat.id, target.id, "muted", admin_id=message.from_user.id, details=f"{duration}s: {reason}")
-
-    # Real Telegram restriction
-    try:
-        until_date = datetime.datetime.now() + datetime.timedelta(seconds=duration)
-        await message.bot.restrict_chat_member(
-            chat_id=message.chat.id,
-            user_id=target.id,
-            permissions=ChatPermissions(can_send_messages=False),
-            until_date=until_date,
-        )
-    except Exception as e:
-        await message.answer(f"⚠️ Cannot restrict: {e}. Make bot admin!")
-
-    await message.answer(t("mute_message", lang, user=get_user_mention(target), duration=_format_duration(duration), reason=reason))
+    await _do_mute(message, args)
 
 
 @router.message(Command("unmute"), IsGroup(), HasRank(1))
@@ -169,7 +204,6 @@ async def cmd_unmute(message: Message) -> None:
         await unmute_member(session, chat.id, user.id)
         await log_action(session, message.chat.id, target.id, "unmuted", admin_id=message.from_user.id)
 
-    # Real Telegram unrestrict
     try:
         await message.bot.restrict_chat_member(
             chat_id=message.chat.id,
@@ -185,6 +219,12 @@ async def cmd_unmute(message: Message) -> None:
         await message.answer(f"⚠️ Cannot unrestrict: {e}")
 
     await message.answer(t("unmute_message", lang, user=get_user_mention(target)))
+
+
+@router.message(Command("ban"), IsGroup(), HasRank(2))
+async def cmd_ban(message: Message) -> None:
+    reason = message.text.removeprefix("/ban").strip() or "No reason"
+    await _do_ban(message, reason)
 
 
 @router.message(Command("warnings"), IsGroup(), HasRank(1))
@@ -211,3 +251,23 @@ async def cmd_list_warnings(message: Message) -> None:
         lines.append(f"{i}. {w.reason or 'No reason'} ({w.created_at.strftime('%Y-%m-%d %H:%M')})")
 
     await message.answer("\n".join(lines))
+
+
+# ── Text aliases: "Пред", "Мут", "Бан" (reply to message) ────────────────────
+
+@router.message(F.text.in_({"Пред", "пред", "ПРЕД"}), F.reply_to_message, IsGroup(), HasRank(1))
+async def text_warn(message: Message) -> None:
+    """Reply with 'Пред' to warn a user."""
+    await _do_warn(message, "Текстовая команда")
+
+
+@router.message(F.text.in_({"Мут", "мут", "МУТ"}), F.reply_to_message, IsGroup(), HasRank(1))
+async def text_mute(message: Message) -> None:
+    """Reply with 'Мут' to mute a user."""
+    await _do_mute(message)
+
+
+@router.message(F.text.in_({"Бан", "бан", "БАН"}), F.reply_to_message, IsGroup(), HasRank(2))
+async def text_ban(message: Message) -> None:
+    """Reply with 'Бан' to ban a user."""
+    await _do_ban(message, "Текстовая команда")

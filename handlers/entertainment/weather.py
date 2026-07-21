@@ -1,7 +1,6 @@
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.weather import get_weather
 

@@ -40,13 +40,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         # Games
         "rps_title": "🪨📄✂️ <b>Камень-Ножницы-Бумага!</b>\nВыбери свой ход:",
+        "rps_usage": "🪨📄✂️ <b>Камень-Ножницы-Бумага!</b>\n\nИспользование: /rps камень|бумага|ножницы\nИли: /rps rock|paper|scissors",
         "rps_user": "Ты",
         "rps_bot": "Бот",
         "rps_win": "🎉 Ты победил!",
         "rps_loss": "😢 Бот победил!",
         "rps_draw": "🤝 Ничья!",
 
-        "guess_title": "🔢 <b>Угадай число!</b>\nЯ загадал число от 1 до 10.",
+        "guess_title": "🔢 <b>Угадай число!</b>\nЯ загадал число от 1 до 10.\n\nИспользуй: /guess <число>",
+        "guess_usage": "🔢 Введи: /guess <число от 1 до 10>",
         "guess_correct": "🎉 <b>Правильно!</b> Число было {number}!\nПопыток: {attempts}",
         "guess_wrong": "❌ Не угадал! Попробуй <b>{hint}</b>.\nПопыток: {attempts}",
         "guess_higher": "больше",
@@ -54,6 +56,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         "trivia_correct": "🎉 <b>Правильно!</b> Отлично!",
         "trivia_wrong": "😢 <b>Неправильно!</b> В следующий раз повезёт!",
+        "trivia_usage": "🧠 Введи: /trivia <номер ответа>",
+        "trivia_no_active": "🧠 Нет активной викторины. Начни с /trivia",
 
         # Fun
         "joke_title": "😂 <b>Случайная шутка</b>",
@@ -157,13 +161,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         # Games
         "rps_title": "🪨📄✂️ <b>Rock-Paper-Scissors!</b>\nChoose your move:",
+        "rps_usage": "🪨📄✂️ <b>Rock-Paper-Scissors!</b>\n\nUsage: /rps rock|paper|scissors",
         "rps_user": "You",
         "rps_bot": "Bot",
         "rps_win": "🎉 You win!",
         "rps_loss": "😢 Bot wins!",
         "rps_draw": "🤝 Draw!",
 
-        "guess_title": "🔢 <b>Guess the number!</b>\nI'm thinking of 1 to 10.",
+        "guess_title": "🔢 <b>Guess the number!</b>\nI'm thinking of 1 to 10.\n\nUse: /guess <number>",
+        "guess_usage": "🔢 Enter: /guess <number from 1 to 10>",
         "guess_correct": "🎉 <b>Correct!</b> The number was {number}!\nAttempts: {attempts}",
         "guess_wrong": "❌ Wrong! Try <b>{hint}</b>.\nAttempts: {attempts}",
         "guess_higher": "higher",
@@ -171,6 +177,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         "trivia_correct": "🎉 <b>Correct!</b> Great job!",
         "trivia_wrong": "😢 <b>Wrong!</b> Better luck next time!",
+        "trivia_usage": "🧠 Enter: /trivia <option number>",
+        "trivia_no_active": "🧠 No active trivia. Start with /trivia",
 
         # Fun
         "joke_title": "😂 <b>Random Joke</b>",

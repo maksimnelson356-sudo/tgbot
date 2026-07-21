@@ -2,11 +2,10 @@ import random
 
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import Message
 
 from db.base import async_session_factory
 from db.queries import get_or_create_user, update_game_stats
-from keyboards.inline import guess_keyboard, rps_keyboard, trivia_keyboard
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -24,6 +23,17 @@ _TRIVIA_QUESTIONS = [
     {"q": "What is the largest mammal in the world?", "options": ["Elephant", "Blue whale", "Giraffe", "Hippopotamus"], "answer": 1},
     {"q": "In which country was sushi first made?", "options": ["China", "Korea", "Japan", "Thailand"], "answer": 2},
     {"q": "What is the chemical symbol for water?", "options": ["H2O", "CO2", "NaCl", "O2"], "answer": 0},
+]
+
+_TRIVIA_QUESTIONS_RU = [
+    {"q": "Какая столица Франции?", "options": ["Лондон", "Париж", "Берлин", "Мадрид"], "answer": 1},
+    {"q": "Сколько континентов на Земле?", "options": ["5", "6", "7", "8"], "answer": 2},
+    {"q": "Какой газ поглощают растения из воздуха?", "options": ["Кислород", "Азот", "Углекислый газ", "Водород"], "answer": 2},
+    {"q": "В каком году человек впервые вышел на Луну?", "options": ["1965", "1967", "1969", "1971"], "answer": 2},
+    {"q": "Какая планета известна как Красная планета?", "options": ["Венера", "Юпитер", "Сатурн", "Марс"], "answer": 3},
+    {"q": "Какое самое большое млекопитающее в мире?", "options": ["Слон", "Синий кит", "Жираф", "Бегемот"], "answer": 1},
+    {"q": "В какой стране впервые начали делать суши?", "options": ["Китай", "Корея", "Япония", "Таиланд"], "answer": 2},
+    {"q": "Как химический символ воды?", "options": ["H2O", "CO2", "NaCl", "O2"], "answer": 0},
 ]
 
 
@@ -51,20 +61,20 @@ async def cmd_bowling(message: Message) -> None:
 
 @router.message(Command("rps"))
 async def cmd_rps(message: Message) -> None:
-    """Start a Rock-Paper-Scissors game."""
     lang = await get_user_lang(message)
-    await message.answer(t("rps_title", lang), reply_markup=rps_keyboard())
+    text = message.text.removeprefix("/rps").strip().lower()
 
-
-@router.callback_query(F.data.startswith("rps:"))
-async def rps_callback(callback: CallbackQuery) -> None:
-    if callback.message is None:
+    if text in ("rock", "камень", "🪨"):
+        user_choice = "rock"
+    elif text in ("paper", "бумага", "📄"):
+        user_choice = "paper"
+    elif text in ("scissors", "ножницы", "✂️"):
+        user_choice = "scissors"
+    else:
+        await message.answer(t("rps_usage", lang))
         return
 
-    lang = await get_user_lang(callback)
-    user_choice = callback.data.split(":")[1]
     bot_choice = random.choice(["rock", "paper", "scissors"])
-
     choices_emoji = {"rock": "🪨", "paper": "📄", "scissors": "✂️"}
 
     if user_choice == bot_choice:
@@ -83,96 +93,100 @@ async def rps_callback(callback: CallbackQuery) -> None:
 
     async with async_session_factory() as session:
         user = await get_or_create_user(
-            session, telegram_id=callback.from_user.id,
+            session, telegram_id=message.from_user.id,
         )
         await update_game_stats(
-            session, user.id, "rps", outcome, chat_id=callback.message.chat.id,
+            session, user.id, "rps", outcome, chat_id=message.chat.id,
         )
 
-    await callback.message.edit_text(
+    await message.answer(
         f"🪨📄✂️ <b>Rock-Paper-Scissors!</b>\n\n"
         f"{t('rps_user', lang)}: {choices_emoji[user_choice]} {user_choice.capitalize()}\n"
         f"{t('rps_bot', lang)}: {choices_emoji[bot_choice]} {bot_choice.capitalize()}\n\n"
         f"<b>{result_text}</b>",
     )
-    await callback.answer()
 
 
 @router.message(Command("guess"))
 async def cmd_guess(message: Message) -> None:
-    """Start a guess-the-number game."""
     lang = await get_user_lang(message)
-    number = random.randint(1, 10)
-    _games[f"guess:{message.from_user.id}"] = {"number": number, "attempts": 0}
-    await message.answer(t("guess_title", lang), reply_markup=guess_keyboard())
+    text = message.text.removeprefix("/guess").strip()
 
+    game_key = f"guess:{message.from_user.id}"
 
-@router.callback_query(F.data.startswith("guess:"))
-async def guess_callback(callback: CallbackQuery) -> None:
-    if callback.message is None:
+    if not text:
+        number = random.randint(1, 10)
+        _games[game_key] = {"number": number, "attempts": 0}
+        await message.answer(t("guess_title", lang))
         return
 
-    lang = await get_user_lang(callback)
-    guess = int(callback.data.split(":")[1])
-    game = _games.get(f"guess:{callback.from_user.id}")
+    if not text.isdigit():
+        await message.answer(t("guess_usage", lang))
+        return
+
+    guess = int(text)
+    game = _games.get(game_key)
 
     if game is None:
-        await callback.answer("No active game. Type /guess to start a new one!")
-        return
+        number = random.randint(1, 10)
+        _games[game_key] = {"number": number, "attempts": 0}
+        game = _games[game_key]
 
     game["attempts"] += 1
     number = game["number"]
 
     if guess == number:
         outcome = "win"
-        text = t("guess_correct", lang, number=number, attempts=game["attempts"])
-        del _games[f"guess:{callback.from_user.id}"]
+        text_result = t("guess_correct", lang, number=number, attempts=game["attempts"])
+        del _games[game_key]
 
         async with async_session_factory() as session:
-            user = await get_or_create_user(session, telegram_id=callback.from_user.id)
-            await update_game_stats(session, user.id, "guess", outcome, chat_id=callback.message.chat.id)
+            user = await get_or_create_user(session, telegram_id=message.from_user.id)
+            await update_game_stats(session, user.id, "guess", outcome, chat_id=message.chat.id)
 
-        await callback.message.edit_text(text)
+        await message.answer(text_result)
     else:
         hint = t("guess_higher", lang) if guess < number else t("guess_lower", lang)
-        text = t("guess_wrong", lang, hint=hint, attempts=game["attempts"])
-        await callback.answer(text)
-        await callback.message.edit_reply_markup(reply_markup=guess_keyboard())
-
-    await callback.answer()
+        text_result = t("guess_wrong", lang, hint=hint, attempts=game["attempts"])
+        await message.answer(text_result)
 
 
 @router.message(Command("trivia"))
 async def cmd_trivia(message: Message) -> None:
-    """Start a trivia game."""
-    q = random.choice(_TRIVIA_QUESTIONS)
-    _games[f"trivia:{message.from_user.id}"] = {"correct": q["answer"]}
-    await message.answer(
-        f"🧠 <b>Trivia!</b>\n\n{q['q']}",
-        reply_markup=trivia_keyboard(q["options"]),
-    )
+    lang = await get_user_lang(message)
+    text = message.text.removeprefix("/trivia").strip()
+    game_key = f"trivia:{message.from_user.id}"
 
+    if not text:
+        questions = _TRIVIA_QUESTIONS_RU if lang == "ru" else _TRIVIA_QUESTIONS
+        q = random.choice(questions)
+        _games[game_key] = {"correct": q["answer"], "options": q["options"]}
 
-@router.callback_query(F.data.startswith("trivia:"))
-async def trivia_callback(callback: CallbackQuery) -> None:
-    if callback.message is None:
+        options_text = "\n".join(f"  {i + 1}. {opt}" for i, opt in enumerate(q["options"]))
+        await message.answer(f"🧠 <b>Trivia!</b>\n\n{q['q']}\n\n{options_text}\n\n💡 /trivia <1-{len(q['options'])}>")
         return
 
-    lang = await get_user_lang(callback)
-    chosen = int(callback.data.split(":")[1])
-    game = _games.get(f"trivia:{callback.from_user.id}")
+    if not text.isdigit():
+        await message.answer(t("trivia_usage", lang))
+        return
+
+    chosen = int(text) - 1
+    game = _games.get(game_key)
 
     if game is None:
-        await callback.answer("No active trivia. Type /trivia to start!")
+        await message.answer(t("trivia_no_active", lang))
+        return
+
+    if chosen < 0 or chosen >= len(game.get("options", [])):
+        await message.answer(t("trivia_usage", lang))
         return
 
     outcome = "win" if chosen == game["correct"] else "loss"
-    del _games[f"trivia:{callback.from_user.id}"]
+    del _games[game_key]
 
     async with async_session_factory() as session:
-        user = await get_or_create_user(session, telegram_id=callback.from_user.id)
-        await update_game_stats(session, user.id, "trivia", outcome, chat_id=callback.message.chat.id)
+        user = await get_or_create_user(session, telegram_id=message.from_user.id)
+        await update_game_stats(session, user.id, "trivia", outcome, chat_id=message.chat.id)
 
-    text = t("trivia_correct", lang) if outcome == "win" else t("trivia_wrong", lang)
-    await callback.message.edit_text(text)
-    await callback.answer()
+    text_result = t("trivia_correct", lang) if outcome == "win" else t("trivia_wrong", lang)
+    await message.answer(text_result)

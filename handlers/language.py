@@ -1,12 +1,10 @@
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import Message
 
 from config import settings
 from db.base import async_session_factory
 from db.queries import get_or_create_user
-from utils.i18n import t as _t
 
 router = Router()
 router.name = "language"
@@ -29,37 +27,20 @@ async def _set_lang(user_id: int, lang: str) -> None:
 
 @router.message(Command("language"))
 async def cmd_language(message: Message) -> None:
-    """Show language selection."""
-    builder = InlineKeyboardBuilder()
-    builder.button(text="🇷🇺 Русский", callback_data="lang:ru")
-    builder.button(text="🇬🇧 English", callback_data="lang:en")
-    builder.adjust(2)
+    text = message.text.removeprefix("/language").strip().lower()
 
-    # Determine current language for the prompt
-    lang = await _get_lang(message.from_user.id)
-
-    # Show in both languages
-    await message.answer(
-        "🌐 <b>Выбери язык / Choose language:</b>",
-        reply_markup=builder.as_markup(),
-    )
-
-
-@router.callback_query(F.data.startswith("lang:"))
-async def lang_callback(callback: CallbackQuery) -> None:
-    """Handle language selection."""
-    lang = callback.data.split(":")[1]
-    if lang not in ("ru", "en"):
-        await callback.answer("Invalid language")
+    if text in ("ru", "russian", "русский"):
+        await _set_lang(message.from_user.id, "ru")
+        await message.answer("✅ Язык установлен: <b>Русский</b>")
+        return
+    elif text in ("en", "english", "английский"):
+        await _set_lang(message.from_user.id, "en")
+        await message.answer("✅ Language set: <b>English</b>")
         return
 
-    await _set_lang(callback.from_user.id, lang)
-
-    response_text = (
-        "✅ Язык установлен: <b>Русский</b>"
-        if lang == "ru"
-        else "✅ Language set: <b>English</b>"
+    lang = await _get_lang(message.from_user.id)
+    await message.answer(
+        "🌐 <b>Выбери язык / Choose language:</b>\n\n"
+        "/language ru — 🇷🇺 Русский\n"
+        "/language en — 🇬🇧 English"
     )
-
-    await callback.message.edit_text(response_text)
-    await callback.answer()

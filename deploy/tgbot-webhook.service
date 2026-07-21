@@ -1,0 +1,15 @@
+[Unit]
+Description=TG Bot Webhook Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/tgbot/deploy
+ExecStart=/usr/bin/python3 /opt/tgbot/deploy/webhook_server.py
+Environment=WEBHOOK_SECRET=my_secret_token_change_me
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
