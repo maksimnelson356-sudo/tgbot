@@ -187,17 +187,17 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "roll_title": "🎲 <b>Roll!</b>\n\nYou rolled: <b>{number}</b>",
 
         # Admin
-        "admin_panel_title": "⚙️ <b>Admin Panel</b>\n\n{statuses}\n\nTap to toggle:",
-        "admin_antispam": "🛡 Anti-spam",
-        "admin_moderation": "📝 Moderation",
-        "admin_links": "🔗 Link filter",
-        "admin_media": "📷 Media filter",
-        "admin_nsfw": "🔞 NSFW filter",
+        "admin_panel_title": "⚙️ <b>Панель управления</b>\n\n{statuses}\n\nНажми для переключения:",
+        "admin_antispam": "🛡 Анти-спам",
+        "admin_moderation": "📝 Модерация",
+        "admin_links": "🔗 Фильтр ссылок",
+        "admin_media": "📷 Фильтр медиа",
+        "admin_nsfw": "🔞 Фильтр 18+",
         "admin_captcha": "🎭 CAPTCHA",
-        "admin_raid": "⚠️ Raid mode",
-        "admin_close": "❌ Close",
-        "on": "✅ ON",
-        "off": "❌ OFF",
+        "admin_raid": "⚠️ Рейд-режим",
+        "admin_close": "❌ Закрыть",
+        "on": "✅ ВКЛ",
+        "off": "❌ ВЫКЛ",
 
         # Warnings
         "warn_no_reply": "Reply to a user to warn them.",
