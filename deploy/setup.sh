@@ -4,8 +4,8 @@
 
 set -e
 
-BOT_DIR="/opt/tgbot"
-REPO_URL=""  # <-- ВСТАВЬ СЮДА URL РЕПОЗИТОРИЯ (например: https://github.com/user/tgbot.git)
+BOT_DIR="/root/tgbot"
+REPO_URL="https://github.com/maksimnelson356-sudo/tgbot.git"
 
 echo "=== Setting up TG Bot ==="
 
