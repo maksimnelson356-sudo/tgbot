@@ -153,6 +153,13 @@ async def cmd_fact(message: Message) -> None:
 _HUG_GIF = "https://i.pinimg.com/originals/7b/73/4e/7b734ed8ced0bb4bd7964bb7f7335711.gif"
 
 
+def _user_name(user) -> str:
+    """Return display name for a user."""
+    if user.username:
+        return f"@{user.username}"
+    return f"<b>{user.first_name or 'Unknown'}</b>"
+
+
 @router.message(Command("hug"))
 @router.message(lambda msg: msg.text and msg.text.lower() in ("обнять", "обними", "обнимашки"))
 async def cmd_hug(message: Message) -> None:
@@ -169,33 +176,41 @@ async def cmd_hug(message: Message) -> None:
         parts = message.text.split()
         for part in parts:
             if part.startswith("@"):
-                username = part[1:]
+                username = part[1:].lower()
+                # Search in chat members
                 try:
-                    full = await message.chat.get_full()
-                    # Try to get member by username via get_administrators
-                    admins = await message.chat.get_administrators()
-                    for a in admins:
-                        if a.user.username and a.user.username.lower() == username.lower():
-                            target = a.user
+                    async for member in message.chat.get_members():
+                        if member.user.username and member.user.username.lower() == username:
+                            target = member.user
                             break
                 except Exception:
                     pass
+                # Fallback: search admins
                 if not target:
-                    text = f"🤗 <b>Hug for @{username}!</b>" if lang == "en" else f"🤗 <b>Обнимашки для @{username}!</b>"
+                    try:
+                        admins = await message.chat.get_administrators()
+                        for a in admins:
+                            if a.user.username and a.user.username.lower() == username:
+                                target = a.user
+                                break
+                    except Exception:
+                        pass
+                if not target:
+                    text = f"🤗 <b>Обнимашки для @{username}!</b>" if lang != "ru" else f"🤗 <b>Обнимашки для @{username}!</b>"
                     await message.answer_animation(animation=hug_gif, caption=text)
                     return
 
     if target:
-        s_name = f"@{sender.username}" if sender.username else f"<b>{sender.first_name}</b>"
+        s_name = _user_name(sender)
         if target.id == sender.id:
-            text = "🤗 <b>Self-hug!</b> You deserve it!" if lang == "en" else "🤗 <b>Обнимашки!</b> Ты это заслужил!"
+            text = "🤗 <b>Обнимашки!</b> Ты это заслужил!" if lang == "ru" else "🤗 <b>Self-hug!</b> You deserve it!"
         elif target.is_bot:
-            text = "🤖 <b>Bot hug!</b> Beep boop 🤗" if lang == "en" else "🤖 <b>Обнимашки бота!</b> Бип-буп 🤗"
+            text = "🤖 <b>Обнимашки бота!</b> Бип-буп 🤗" if lang == "ru" else "🤖 <b>Bot hug!</b> Beep boop 🤗"
         else:
-            t_name = f"@{target.username}" if target.username else f"<b>{target.first_name}</b>"
-            text = f"🤗 {s_name} hugged {t_name}!" if lang == "en" else f"🤗 {s_name} обнял(а) {t_name}!"
+            t_name = _user_name(target)
+            text = f"🤗 {s_name} обнял(а) {t_name}!" if lang == "ru" else f"🤗 {s_name} hugged {t_name}!"
     else:
-        text = "🤗 <b>Hug!</b>" if lang == "en" else "🤗 <b>Обнимашки!</b>"
+        text = "🤗 <b>Обнимашки!</b>" if lang == "ru" else "🤗 <b>Hug!</b>"
 
     try:
         await message.answer_animation(animation=hug_gif, caption=text)
