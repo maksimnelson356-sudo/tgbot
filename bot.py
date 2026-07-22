@@ -13,6 +13,16 @@ from db.base import init_db
 
 logger = logging.getLogger(__name__)
 
+_AUTO_DELETE_DELAY = 5.0
+
+
+async def _auto_delete_message(message, delay: float = _AUTO_DELETE_DELAY) -> None:
+    await asyncio.sleep(delay)
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
 
 async def set_bot_commands(bot: Bot) -> None:
     """Set bot commands visible in the menu."""
@@ -153,6 +163,23 @@ async def main() -> None:
         token=settings.BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+
+    # Auto-delete all bot messages in groups after 5 seconds
+    _orig_call = bot.__call__
+
+    async def _auto_delete_call(method):
+        result = await _orig_call(method)
+        try:
+            from aiogram.methods.send_message import SendMessage
+            if isinstance(method, SendMessage) and result:
+                chat_id = str(method.chat_id)
+                if chat_id.startswith("-"):
+                    asyncio.create_task(_auto_delete_message(result, 5.0))
+        except Exception:
+            pass
+        return result
+
+    bot.__call__ = _auto_delete_call  # type: ignore
 
     dp = Dispatcher()
 
