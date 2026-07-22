@@ -4,9 +4,9 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from services.music_service import search_and_download
+from services.music_service import search
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -29,7 +29,7 @@ async def _do_search(message: Message, query: str) -> None:
     lang = await get_user_lang(message)
     searching = await message.answer(t("music_searching", lang, query=query))
 
-    result = await search_and_download(query)
+    result = await search(query)
 
     if result is None:
         await searching.edit_text(t("music_not_found", lang, query=query))
@@ -38,28 +38,19 @@ async def _do_search(message: Message, query: str) -> None:
     duration_str = _format_duration(result.duration) if result.duration else "?"
 
     try:
-        result.audio.seek(0)
-        await message.answer_audio(
-            audio=result.audio,
-            title=f"{result.artist} - {result.title}",
-            performer=result.artist,
-            duration=result.duration or None,
-            caption=t("music_caption", lang, artist=result.artist, title=result.title, duration=duration_str),
+        buttons = []
+        if result.preview_url:
+            buttons.append([InlineKeyboardButton(text="▶️ Превью (30 сек)", url=result.preview_url)])
+        if result.url:
+            buttons.append([InlineKeyboardButton(text="🔗 Deezer", url=result.url)])
+        await message.answer(
+            text=t("music_caption", lang, artist=result.artist, title=result.title, duration=duration_str),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None,
         )
         await searching.delete()
     except Exception as e:
-        logger.warning("Failed to send audio: %s", e)
-        # Fallback: try sending as voice
-        try:
-            result.audio.seek(0)
-            await message.answer_voice(
-                voice=result.audio,
-                caption=t("music_caption", lang, artist=result.artist, title=result.title, duration=duration_str),
-            )
-            await searching.delete()
-        except Exception as e2:
-            logger.warning("Failed to send voice either: %s", e2)
-            await searching.edit_text(t("music_too_large", lang))
+        logger.warning("Failed to send music result: %s", e)
+        await searching.edit_text(t("music_too_large", lang))
 
 
 @router.message(Command("music"))
