@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 from aiogram import Router, F
 from aiogram.filters import Command
@@ -13,7 +14,7 @@ from aiogram.types import (
     InlineKeyboardButton,
 )
 
-from services.music_service import search, download_track, MusicTrack
+from services.music_service import search, download_track
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -23,10 +24,8 @@ router = Router()
 router.name = "music"
 
 RESULTS_PER_PAGE = 5
-
-
-class MusicState(StatesGroup):
-    waiting_query = State()
+_track_cache: dict[str, tuple[float, list]] = {}
+CACHE_TTL = 300  # 5 minutes
 
 
 def _format_duration(seconds: int) -> str:
@@ -34,21 +33,32 @@ def _format_duration(seconds: int) -> str:
     return f"{m}:{s:02d}"
 
 
+async def _get_tracks(query: str) -> list:
+    cached = _track_cache.get(query)
+    if cached and time.time() - cached[0] < CACHE_TTL:
+        return cached[1]
+    tracks = await search(query, limit=20)
+    if tracks:
+        _track_cache[query] = (time.time(), tracks)
+    return tracks
+
+
 def _build_results_keyboard(tracks: list, query: str, page: int = 0) -> InlineKeyboardMarkup:
     buttons = []
     start = page * RESULTS_PER_PAGE
-    for i, track in enumerate(tracks[start:start + RESULTS_PER_PAGE]):
+    page_tracks = tracks[start:start + RESULTS_PER_PAGE]
+    for i, track in enumerate(page_tracks):
         idx = start + i
-        label = f"{idx+1}. {track.artist} — {track.title} ({_format_duration(track.duration)})"
+        label = f"{idx+1}. {track.artist} — {_format_duration(track.duration)}"
         payload = json.dumps({"q": query, "i": idx})
-        buttons.append([InlineKeyboardButton(text=label, callback_data=f"music:{payload}")])
+        buttons.append([InlineKeyboardButton(text=label, callback_data=f"m:{payload}")])
 
     total_pages = (len(tracks) + RESULTS_PER_PAGE - 1) // RESULTS_PER_PAGE
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton(text="⬅️", callback_data=f"music_page:{json.dumps({'q': query, 'p': page-1})}"))
+        nav.append(InlineKeyboardButton(text="⬅️", callback_data=f"mp:{json.dumps({'q': query, 'p': page-1})}"))
     if page < total_pages - 1:
-        nav.append(InlineKeyboardButton(text="➡️", callback_data=f"music_page:{json.dumps({'q': query, 'p': page+1})}"))
+        nav.append(InlineKeyboardButton(text="➡️", callback_data=f"mp:{json.dumps({'q': query, 'p': page+1})}"))
     if nav:
         buttons.append(nav)
 
@@ -59,7 +69,7 @@ async def _do_search(message: Message, query: str) -> None:
     lang = await get_user_lang(message)
     searching = await message.answer(t("music_searching", lang, query=query))
 
-    tracks = await search(query, limit=20)
+    tracks = await _get_tracks(query)
 
     if not tracks:
         await searching.edit_text(t("music_not_found", lang, query=query))
@@ -67,18 +77,18 @@ async def _do_search(message: Message, query: str) -> None:
 
     kb = _build_results_keyboard(tracks, query, page=0)
     await searching.edit_text(
-        f"🎶 Найдено по запросу <b>{query}</b> ({len(tracks)} треков):",
+        f"🎶 <b>{query}</b> — {len(tracks)} треков:",
         reply_markup=kb,
     )
 
 
-@router.callback_query(F.data.startswith("music_page:"))
+@router.callback_query(F.data.startswith("mp:"))
 async def on_music_page(callback: CallbackQuery) -> None:
-    data = json.loads(callback.data.removeprefix("music_page:"))
+    data = json.loads(callback.data.removeprefix("mp:"))
     query = data["q"]
     page = data["p"]
 
-    tracks = await search(query, limit=20)
+    tracks = await _get_tracks(query)
     if not tracks:
         await callback.answer("Ничего не найдено", show_alert=True)
         return
@@ -88,19 +98,20 @@ async def on_music_page(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("music:"))
+@router.callback_query(F.data.startswith("m:"))
 async def on_music_pick(callback: CallbackQuery) -> None:
-    data = json.loads(callback.data.removeprefix("music:"))
+    data = json.loads(callback.data.removeprefix("m:"))
     query = data["q"]
     idx = data["i"]
 
-    tracks = await search(query, limit=20)
+    tracks = await _get_tracks(query)
     if idx >= len(tracks):
         await callback.answer("Трек не найден", show_alert=True)
         return
 
     track = tracks[idx]
-    await callback.answer(f"📥 Загружаю {track.artist} — {track.title}...")
+    # Answer immediately before heavy download
+    await callback.answer(f"📥 {track.artist} — {track.title}")
 
     audio = await download_track(track)
     if audio is None:
@@ -130,6 +141,10 @@ async def cmd_music(message: Message, state: FSMContext) -> None:
 
     await message.answer(t("music_ask_query", lang))
     await state.set_state(MusicState.waiting_query)
+
+
+class MusicState(StatesGroup):
+    waiting_query = State()
 
 
 @router.message(MusicState.waiting_query)
