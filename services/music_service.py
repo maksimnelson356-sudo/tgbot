@@ -1,79 +1,129 @@
-"""Music search and download - Deezer (search) + SoundCloud (full tracks fallback)."""
+"""Music search and download via Hitmo (parses HTML)."""
 
 import io
-import json
 import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import quote
 
 import aiohttp
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-_client_id_cache: Optional[str] = None
+HITMO_MIRRORS = [
+    "https://rus.hitmotop.com",
+    "https://hitmoz.org",
+    "https://hitmotop.com",
+]
 
 
 @dataclass
 class MusicTrack:
     title: str
     artist: str
-    duration: int
-    preview_url: str       # Deezer 30s preview
-    deezer_url: str        # Deezer page
-    track_id: int          # Deezer track ID
+    duration: str
+    download_url: str
+    image_url: str
+
+
+async def _try_mirror(base_url: str, query: str, limit: int, session: aiohttp.ClientSession) -> list[MusicTrack]:
+    """Try searching on a single mirror."""
+    search_url = f"{base_url}/search"
+    params = {"q": query}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+    }
+
+    try:
+        async with session.get(search_url, params=params, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status != 200:
+                logger.info("Hitmo mirror %s returned %d", base_url, resp.status)
+                return []
+
+            html = await resp.text()
+            soup = BeautifulSoup(html, "html.parser")
+
+            results = []
+            items = soup.select(".track__wrapper, .tracks__item, .song-item, .item-song")
+
+            for item in items[:limit]:
+                # Try multiple selectors for title/artist
+                title_el = item.select_one(".track__title, .song-title, .title")
+                artist_el = item.select_one(".track__desc, .artist-name, .artist")
+                time_el = item.select_one(".track__time, .song-duration, .duration")
+                img_el = item.select_one("img")
+                dl_el = item.select_one('a[href*="/download/"], a.track__download-btn, a[download]')
+
+                if not dl_el:
+                    continue
+
+                title = title_el.get_text(strip=True) if title_el else "Unknown"
+                artist = artist_el.get_text(strip=True) if artist_el else "Unknown"
+                duration = time_el.get_text(strip=True) if time_el else "?"
+                dl_url = dl_el.get("href", "")
+                img_url = img_el.get("src", img_el.get("data-src", "")) if img_el else ""
+
+                if dl_url and not dl_url.startswith("http"):
+                    dl_url = base_url + dl_url
+
+                results.append(MusicTrack(
+                    title=title,
+                    artist=artist,
+                    duration=duration,
+                    download_url=dl_url,
+                    image_url=img_url,
+                ))
+
+            return results
+
+    except Exception as e:
+        logger.info("Hitmo mirror %s error: %s", base_url, e)
+        return []
 
 
 async def search(query: str, limit: int = 5) -> list[MusicTrack]:
-    """Search Deezer (reliable) for tracks."""
-    url = "https://api.deezer.com/search"
-    params = {"q": query, "limit": limit}
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as resp:
-                if resp.status != 200:
-                    logger.warning("Deezer search failed: %d", resp.status)
-                    return []
-
-                data = await resp.json()
-                tracks = data.get("data", [])
-                results = []
-                for t in tracks:
-                    if not t.get("preview"):
-                        continue
-                    results.append(MusicTrack(
-                        title=t.get("title", "Unknown"),
-                        artist=t.get("artist", {}).get("name", "Unknown"),
-                        duration=t.get("duration", 0),
-                        preview_url=t.get("preview", ""),
-                        deezer_url=t.get("link", ""),
-                        track_id=t.get("id", 0),
-                    ))
-                    if len(results) >= limit:
-                        break
+    """Search Hitmo across mirrors."""
+    async with aiohttp.ClientSession() as session:
+        for mirror in HITMO_MIRRORS:
+            results = await _try_mirror(mirror, query, limit, session)
+            if results:
+                logger.info("Found %d results on %s", len(results), mirror)
                 return results
 
-    except Exception as e:
-        logger.warning("Music search error: %s", e)
+        logger.warning("No results from any Hitmo mirror")
         return []
 
 
 async def download_track(track: MusicTrack) -> Optional[io.BytesIO]:
-    """Download the Deezer preview (30s MP3)."""
-    if not track.preview_url:
+    """Download track from Hitmo."""
+    if not track.download_url:
         return None
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer": "https://rus.hitmotop.com/",
+    }
+
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(track.preview_url) as resp:
+            async with session.get(track.download_url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 if resp.status != 200:
+                    logger.warning("Download failed: %d", resp.status)
                     return None
+
                 data = await resp.read()
-                if len(data) < 1000:
+                if len(data) < 10000:
+                    logger.warning("Downloaded file too small: %d bytes", len(data))
                     return None
+
                 buf = io.BytesIO(data)
                 buf.name = f"{track.artist} - {track.title}.mp3"
                 return buf
+
     except Exception as e:
         logger.warning("Download error: %s", e)
         return None

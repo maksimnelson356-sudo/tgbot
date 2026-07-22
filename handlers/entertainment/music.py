@@ -49,7 +49,8 @@ def _build_results_keyboard(tracks: list, query: str, page: int = 0) -> InlineKe
     page_tracks = tracks[start:start + RESULTS_PER_PAGE]
     for i, track in enumerate(page_tracks):
         idx = start + i
-        label = f"{idx+1}. {track.artist} — {track.title} ({_format_duration(track.duration)})"
+        dur = f" ({track.duration})" if track.duration else ""
+        label = f"{idx+1}. {track.artist} — {track.title}{dur}"
         payload = json.dumps({"q": query, "i": idx})
         buttons.append([InlineKeyboardButton(text=label, callback_data=f"m:{payload}")])
 
@@ -110,24 +111,18 @@ async def on_music_pick(callback: CallbackQuery) -> None:
         return
 
     track = tracks[idx]
-    await callback.answer()
+    await callback.answer(f"📥 {track.artist} — {track.title}")
 
     audio = await download_track(track)
     if audio is None:
         await callback.message.answer("❌ Не удалось загрузить трек")
         return
 
-    duration_str = _format_duration(track.duration)
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎧 Полная версия в Deezer", url=track.deezer_url)],
-    ])
     await callback.message.answer_audio(
         audio=BufferedInputFile(audio.read(), filename=audio.name),
         title=track.title,
         performer=track.artist,
-        duration=track.duration or None,
-        caption=f"🎵 {track.artist} — {track.title}\n⏱ {duration_str}\n\n🎧 Нужна полная версия?",
-        reply_markup=kb,
+        caption=f"🎵 {track.artist} — {track.title}\n⏱ {track.duration}",
     )
 
 
