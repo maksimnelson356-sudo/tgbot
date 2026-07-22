@@ -1,4 +1,5 @@
 from typing import Optional
+import asyncio
 import hashlib
 import logging
 import time
@@ -26,6 +27,15 @@ router.name = "music"
 
 RESULTS_PER_PAGE = 5
 CACHE_TTL = 300
+
+
+async def _delete_later(msg: Message, delay: float = 3.0) -> None:
+    """Delete a message after a delay."""
+    await asyncio.sleep(delay)
+    try:
+        await msg.delete()
+    except Exception:
+        pass
 
 # Cache: short_key -> (timestamp, query, tracks, user_id)
 _cache: dict[str, tuple[float, str, list, int]] = {}
@@ -166,7 +176,10 @@ async def cmd_music(message: Message, state: FSMContext) -> None:
         await _do_search(message, query)
         return
 
-    await message.answer(t("music_ask_query", lang))
+    prompt = await message.answer(t("music_ask_query", lang))
+    # Delete the prompt after 10s in groups
+    if message.chat.type in ("group", "supergroup"):
+        asyncio.create_task(_delete_later(prompt, 10.0))
     await state.set_state(MusicState.waiting_query)
 
 
@@ -183,6 +196,13 @@ async def on_music_query(message: Message, state: FSMContext) -> None:
     if text.startswith("/"):
         await state.clear()
         return
+
+    # Delete the user's query message in groups
+    if message.chat.type in ("group", "supergroup"):
+        try:
+            await message.delete()
+        except Exception:
+            pass
 
     await state.clear()
     await _do_search(message, text)
