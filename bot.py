@@ -40,6 +40,7 @@ async def set_bot_commands(bot: Bot) -> None:
     # Commands for groups (only group-relevant)
     group_commands = [
         BotCommand(command="admin", description="Admin panel ⚙️"),
+        BotCommand(command="panel", description="Mini App panel 🖥"),
         BotCommand(command="warn", description="Warn a user ⚠️"),
         BotCommand(command="unwarn", description="Remove warning ✅"),
         BotCommand(command="mute", description="Mute a user 🔇"),
@@ -68,6 +69,9 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="removeadmin", description="Понизить админа ➖"),
         BotCommand(command="adminlist", description="Bot admins list 📋"),
         BotCommand(command="daystats", description="Today's stats 📊"),
+        BotCommand(command="schedule", description="Scheduled post 📅"),
+        BotCommand(command="schedule_list", description="List schedules 📋"),
+        BotCommand(command="schedule_del", description="Delete schedule ❌"),
         BotCommand(command="addreply", description="Add auto-reply 📝"),
         BotCommand(command="listreplies", description="List auto-replies 📋"),
         BotCommand(command="setbday", description="Set birthday 🎂"),
@@ -109,6 +113,10 @@ async def on_startup(bot: Bot) -> None:
     await set_bot_commands(bot)
     logger.info("Bot started: @%s (id: %s)", me.username, me.id)
 
+    # Start scheduler
+    from services.scheduler_service import start_scheduler
+    start_scheduler(bot)
+
 
 async def on_shutdown(bot: Bot) -> None:
     """Cleanup on shutdown."""
@@ -136,6 +144,7 @@ async def main() -> None:
     # ── Import and register routers ──────────────────────────────────────
     from handlers.start import router as start_router
     from handlers.protection.antispam import router as antispam_router
+    from handlers.protection.captcha_handler import router as captcha_router
     from handlers.protection.moderation import router as moderation_router
     from handlers.protection.warnings import router as warnings_router
     from handlers.protection.admin_panel import router as admin_panel_router
@@ -160,6 +169,8 @@ async def main() -> None:
     from handlers.feedback import router as feedback_router
     from handlers.protection.setlog import router as setlog_router
     from handlers.protection.utilities import router as utilities_router
+    from handlers.protection.scheduler import router as scheduler_router
+    from handlers.protection.webapp import router as webapp_router
 
     # ── Register middlewares ──────────────────────────────────────────────
     from middlewares.throttling import ThrottlingMiddleware
@@ -176,6 +187,7 @@ async def main() -> None:
     # ── Register routers ─────────────────────────────────────────────────
     dp.include_router(start_router)
     dp.include_router(antispam_router)
+    dp.include_router(captcha_router)
     dp.include_router(admin_panel_router)
     dp.include_router(warnings_router)
     dp.include_router(games_router)
@@ -200,6 +212,8 @@ async def main() -> None:
     dp.include_router(feedback_router)
     dp.include_router(setlog_router)
     dp.include_router(utilities_router)
+    dp.include_router(scheduler_router)
+    dp.include_router(webapp_router)
 
     logger.info("Starting polling...")
     await dp.start_polling(bot)

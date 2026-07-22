@@ -69,13 +69,20 @@ async def on_chat_member_update(event: ChatMemberUpdated) -> None:
                 _raid_mode[chat_id] = True
                 _raid_timestamps[chat_id] = time.time()
 
-        # Send welcome — use new member's first_name
-        welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
-        name = new_user.first_name or new_user.username or str(new_user.id)
-        try:
-            await event.answer(f"👋 {name}, {welcome_msg}")
-        except Exception:
-            pass
+        # CAPTCHA or welcome
+        if chat.settings.get("captcha_enabled", True):
+            from handlers.protection.captcha_handler import send_captcha
+            try:
+                await send_captcha(chat_id, user_id, event.bot)
+            except Exception:
+                pass
+        else:
+            welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
+            name = new_user.first_name or new_user.username or str(new_user.id)
+            try:
+                await event.answer(f"👋 {name}, {welcome_msg}")
+            except Exception:
+                pass
 
 
 @router.message(F.new_chat_members)
@@ -105,12 +112,19 @@ async def on_new_members(message: Message) -> None:
             await add_chat_member(session, chat.id, (await get_or_create_user(session, telegram_id=member.id)).id)
             await log_action(session, message.chat.id, member.id, "joined")
 
-        # Send welcome
-        name = member.first_name or member.username or str(member.id)
-        try:
-            await message.answer(f"👋 {name}, Добро пожаловать!")
-        except Exception:
-            pass
+            # CAPTCHA or welcome
+            if chat.settings.get("captcha_enabled", True):
+                from handlers.protection.captcha_handler import send_captcha
+                try:
+                    await send_captcha(message.chat.id, member.id, message.bot)
+                except Exception:
+                    pass
+            else:
+                name = member.first_name or member.username or str(member.id)
+                try:
+                    await message.answer(f"👋 {name}, Добро пожаловать!")
+                except Exception:
+                    pass
 
     # Auto-delete service message if enabled
     try:

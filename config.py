@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # CAPTCHA defaults
     CAPTCHA_TIMEOUT: int = 60  # seconds
     CAPTCHA_MAX_ATTEMPTS: int = 3
+    CAPTCHA_IMAGE_WIDTH: int = 200
+    CAPTCHA_IMAGE_HEIGHT: int = 80
+    CAPTCHA_FONT_SIZE: int = 40
 
     # Raid defaults
     RAID_JOIN_THRESHOLD: int = 5  # users

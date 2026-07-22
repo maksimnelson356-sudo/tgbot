@@ -117,6 +117,32 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "mod_muted": "{user} замучен ({count}/3) — {reason}",
         "mod_warned": "{user}, предупреждение {count}/3: {reason}",
 
+        # Captcha
+        "captcha_prompt": "🔐 <b>Добро пожаловать!</b>\n\nЧтобы подтвердить, что ты не бот, введи код с картинки:\n⏳ У тебя 60 секунд",
+        "captcha_passed": "✅ <b>{name}</b>, капча пройдена! Добро пожаловать!",
+        "captcha_wrong": "❌ Неправильно! Осталось попыток: <b>{attempts}</b>",
+        "captcha_too_many": "🚫 {name}, слишком много попыток. Ты заблокирован.",
+        "captcha_expired": "⏰ Время на капчу истекло. Ты заблокирован.",
+
+        # Scheduler
+        "schedule_ask_text": "📝 Введи текст сообщения (или нажми «Пропустить» если только фото):",
+        "schedule_ask_photo": "📷 Пришли фото (или нажми «Пропустить»):",
+        "schedule_ask_photo_again": "📷 Пришли фото или нажми «Пропустить»:",
+        "schedule_ask_interval": "⏰ Через сколько часов повторять?",
+        "schedule_invalid_interval": "❌ Введи число от 1 до 24",
+        "schedule_empty": "❌ Текст и фото пустые. Создание отменено.",
+        "schedule_created": "✅ Рассылка #{id} создана! Каждые {interval}ч",
+        "schedule_none": "📋 Нет активных рассылок.",
+        "schedule_list_title": "📋 <b>Рассылки:</b>",
+        "schedule_del_usage": "Использование: /schedule_del <id>",
+        "schedule_deleted": "✅ Рассылка #{id} удалена.",
+        "schedule_not_found": "❌ Рассылка #{id} не найдена.",
+        "skip": "Пропустить",
+
+        # WebApp
+        "panel_title": "⚙️ <b>Панель управления</b>\n\nНажми кнопку ниже, чтобы открыть мини-приложение:",
+        "panel_button": "⚙️ Открыть панель",
+
         # Game names
         "game_rps": "🪨 Камень-Ножницы-Бумага",
         "game_guess": "🔢 Угадай число",
@@ -245,6 +271,32 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "mod_media": "Media not allowed",
         "mod_muted": "{user} muted ({count}/3) — {reason}",
         "mod_warned": "{user}, warning {count}/3: {reason}",
+
+        # Captcha
+        "captcha_prompt": "🔐 <b>Welcome!</b>\n\nTo prove you're not a bot, enter the code from the image:\n⏳ You have 60 seconds",
+        "captcha_passed": "✅ <b>{name}</b>, captcha passed! Welcome!",
+        "captcha_wrong": "❌ Wrong! Attempts left: <b>{attempts}</b>",
+        "captcha_too_many": "🚫 {name}, too many attempts. You are banned.",
+        "captcha_expired": "⏰ Captcha time expired. You are banned.",
+
+        # Scheduler
+        "schedule_ask_text": "📝 Enter message text (or press «Skip» if photo only):",
+        "schedule_ask_photo": "📷 Send a photo (or press «Skip»):",
+        "schedule_ask_photo_again": "📷 Send a photo or press «Skip»:",
+        "schedule_ask_interval": "⏰ Repeat every how many hours?",
+        "schedule_invalid_interval": "❌ Enter a number from 1 to 24",
+        "schedule_empty": "❌ Text and photo are empty. Cancelled.",
+        "schedule_created": "✅ Scheduled post #{id} created! Every {interval}h",
+        "schedule_none": "📋 No active scheduled posts.",
+        "schedule_list_title": "📋 <b>Scheduled posts:</b>",
+        "schedule_del_usage": "Usage: /schedule_del <id>",
+        "schedule_deleted": "✅ Scheduled post #{id} deleted.",
+        "schedule_not_found": "❌ Scheduled post #{id} not found.",
+        "skip": "Skip",
+
+        # WebApp
+        "panel_title": "⚙️ <b>Admin Panel</b>\n\nPress the button below to open the mini-app:",
+        "panel_button": "⚙️ Open panel",
 
         # Game names
         "game_rps": "🪨 Rock-Paper-Scissors",

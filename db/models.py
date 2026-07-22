@@ -172,3 +172,20 @@ class ChatAdmin(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.now
     )
+
+
+class ScheduledPost(Base):
+    """Scheduled recurring messages to a chat."""
+    __tablename__ = "scheduled_posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chat_telegram_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    text: Mapped[str] = mapped_column(Text)
+    photo_file_id: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    interval_hours: Mapped[int] = mapped_column(Integer, nullable=False)
+    last_sent_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    created_by: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now
+    )

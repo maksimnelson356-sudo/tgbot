@@ -502,3 +502,77 @@ async def list_banned_stickers(session: AsyncSession, chat_id: int) -> list[Bann
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+# ── Scheduled Posts ────────────────────────────────────────────────────────
+
+async def add_scheduled_post(
+    session: AsyncSession,
+    chat_telegram_id: int,
+    text: str,
+    interval_hours: int,
+    created_by: int,
+    photo_file_id: Optional[str] = None,
+) -> "ScheduledPost":
+    from db.models import ScheduledPost
+    post = ScheduledPost(
+        chat_telegram_id=chat_telegram_id,
+        text=text,
+        photo_file_id=photo_file_id,
+        interval_hours=interval_hours,
+        created_by=created_by,
+    )
+    session.add(post)
+    await session.commit()
+    await session.refresh(post)
+    return post
+
+
+async def get_scheduled_posts(session: AsyncSession, chat_telegram_id: int) -> list:
+    from db.models import ScheduledPost
+    stmt = (
+        select(ScheduledPost)
+        .where(
+            ScheduledPost.chat_telegram_id == chat_telegram_id,
+            ScheduledPost.is_active == True,
+        )
+        .order_by(ScheduledPost.created_at.desc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_due_posts(session: AsyncSession) -> list:
+    """Get all posts that are due to be sent."""
+    from db.models import ScheduledPost
+    now = datetime.datetime.now()
+    stmt = select(ScheduledPost).where(ScheduledPost.is_active == True)
+    result = await session.execute(stmt)
+    all_posts = list(result.scalars().all())
+    due = []
+    for post in all_posts:
+        if post.last_sent_at is None:
+            due.append(post)
+        else:
+            elapsed = (now - post.last_sent_at).total_seconds()
+            if elapsed >= post.interval_hours * 3600:
+                due.append(post)
+    return due
+
+
+async def update_post_last_sent(session: AsyncSession, post_id: int) -> None:
+    from db.models import ScheduledPost
+    post = await session.get(ScheduledPost, post_id)
+    if post:
+        post.last_sent_at = datetime.datetime.now()
+        await session.commit()
+
+
+async def delete_scheduled_post(session: AsyncSession, post_id: int) -> bool:
+    from db.models import ScheduledPost
+    post = await session.get(ScheduledPost, post_id)
+    if post is None:
+        return False
+    post.is_active = False
+    await session.commit()
+    return True
