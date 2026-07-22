@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -7,6 +9,8 @@ from aiogram.types import Message
 from services.music_service import search_and_download
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 router.name = "music"
@@ -43,8 +47,19 @@ async def _do_search(message: Message, query: str) -> None:
             caption=t("music_caption", lang, artist=result.artist, title=result.title, duration=duration_str),
         )
         await searching.delete()
-    except Exception:
-        await searching.edit_text(t("music_too_large", lang))
+    except Exception as e:
+        logger.warning("Failed to send audio: %s", e)
+        # Fallback: try sending as voice
+        try:
+            result.audio.seek(0)
+            await message.answer_voice(
+                voice=result.audio,
+                caption=t("music_caption", lang, artist=result.artist, title=result.title, duration=duration_str),
+            )
+            await searching.delete()
+        except Exception as e2:
+            logger.warning("Failed to send voice either: %s", e2)
+            await searching.edit_text(t("music_too_large", lang))
 
 
 @router.message(Command("music"))
