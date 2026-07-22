@@ -26,13 +26,25 @@ async def _auto_delete_message(message, delay: float = _AUTO_DELETE_DELAY) -> No
 
 async def set_bot_commands(bot: Bot) -> None:
     """Set bot commands visible in the menu."""
-    from aiogram.types import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
+    from aiogram.types import (
+        BotCommand, BotCommandScopeDefault,
+        BotCommandScopeAllGroupChats, BotCommandScopeAllChatAdministrators,
+    )
 
-    # Commands for private chat (all commands)
+    # ── Private chat (all commands) ────────────────────────────────────
     private_commands = [
         BotCommand(command="start", description="Start / Главная"),
         BotCommand(command="help", description="Help / Помощь"),
         BotCommand(command="language", description="Language / Язык"),
+        BotCommand(command="panel", description="Mini App panel 🖥"),
+        BotCommand(command="admin", description="Admin panel ⚙️"),
+        BotCommand(command="warn", description="Warn a user ⚠️"),
+        BotCommand(command="unwarn", description="Remove warning ✅"),
+        BotCommand(command="mute", description="Mute a user 🔇"),
+        BotCommand(command="ban", description="Ban a user 🔨"),
+        BotCommand(command="unmute", description="Unmute a user 🔊"),
+        BotCommand(command="warnings", description="List warnings 📋"),
+        BotCommand(command="music", description="Search music 🎵"),
         BotCommand(command="rps", description="Rock-Paper-Scissors 🪨"),
         BotCommand(command="dice", description="Roll dice 🎲"),
         BotCommand(command="dart", description="Throw dart 🎯"),
@@ -41,23 +53,15 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="trivia", description="Trivia quiz 🧠"),
         BotCommand(command="joke", description="Random joke 😂"),
         BotCommand(command="fact", description="Random fact 🧠"),
-        BotCommand(command="music", description="Search music 🎵"),
         BotCommand(command="roll", description="Random number 🎲"),
         BotCommand(command="hug", description="Hug someone 🤗"),
         BotCommand(command="top", description="Leaderboard 🏆"),
         BotCommand(command="stats", description="Your stats 📊"),
     ]
 
-    # Commands for groups (only group-relevant)
-    group_commands = [
-        BotCommand(command="admin", description="Admin panel ⚙️"),
-        BotCommand(command="panel", description="Mini App panel 🖥"),
-        BotCommand(command="warn", description="Warn a user ⚠️"),
-        BotCommand(command="unwarn", description="Remove warning ✅"),
-        BotCommand(command="mute", description="Mute a user 🔇"),
-        BotCommand(command="ban", description="Ban a user 🔨"),
-        BotCommand(command="unmute", description="Unmute a user 🔊"),
-        BotCommand(command="warnings", description="List warnings 📋"),
+    # ── Groups — regular users see only these ──────────────────────────
+    user_group_commands = [
+        BotCommand(command="music", description="Search music 🎵"),
         BotCommand(command="id", description="Show IDs 🆔"),
         BotCommand(command="info", description="User info 👤"),
         BotCommand(command="report", description="Report message 🚨"),
@@ -66,8 +70,24 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="rep", description="Check reputation ⭐"),
         BotCommand(command="toprep", description="Reputation top 🏆"),
         BotCommand(command="rules", description="Chat rules 📜"),
-        BotCommand(command="zombies", description="Clean dead accounts 🧟"),
-        BotCommand(command="music", description="Search music 🎵"),
+        BotCommand(command="joke", description="Random joke 😂"),
+        BotCommand(command="fact", description="Random fact 🧠"),
+        BotCommand(command="weather", description="Weather 🌤"),
+        BotCommand(command="feedback", description="Feedback to owner 💬"),
+        BotCommand(command="birthdays", description="View birthdays 🎉"),
+        BotCommand(command="setbday", description="Set birthday 🎂"),
+    ]
+
+    # ── Groups — admin-only commands ───────────────────────────────────
+    admin_group_commands = [
+        BotCommand(command="admin", description="Admin panel ⚙️"),
+        BotCommand(command="panel", description="Mini App panel 🖥"),
+        BotCommand(command="warn", description="Warn a user ⚠️"),
+        BotCommand(command="unwarn", description="Remove warning ✅"),
+        BotCommand(command="mute", description="Mute a user 🔇"),
+        BotCommand(command="unmute", description="Unmute a user 🔊"),
+        BotCommand(command="ban", description="Ban a user 🔨"),
+        BotCommand(command="warnings", description="List warnings 📋"),
         BotCommand(command="pin", description="Pin message 📌"),
         BotCommand(command="unpin", description="Unpin message 📌"),
         BotCommand(command="admins", description="List admins 👑"),
@@ -75,8 +95,6 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="clean", description="Delete bot messages 🧹"),
         BotCommand(command="allowlink", description="Whitelist domain ✅"),
         BotCommand(command="slowmode", description="Set slow mode 🐌"),
-        BotCommand(command="weather", description="Weather 🌤"),
-        BotCommand(command="feedback", description="Feedback to owner 💬"),
         BotCommand(command="addadmin", description="Назначить админа ➕"),
         BotCommand(command="removeadmin", description="Понизить админа ➖"),
         BotCommand(command="adminlist", description="Bot admins list 📋"),
@@ -86,30 +104,19 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="schedule_del", description="Delete schedule ❌"),
         BotCommand(command="addreply", description="Add auto-reply 📝"),
         BotCommand(command="listreplies", description="List auto-replies 📋"),
-        BotCommand(command="setbday", description="Set birthday 🎂"),
-        BotCommand(command="birthdays", description="View birthdays 🎉"),
         BotCommand(command="purge", description="Delete messages 🗑️"),
         BotCommand(command="note", description="Add note 📝"),
         BotCommand(command="notes", description="List notes 📋"),
         BotCommand(command="delnote", description="Delete note ❌"),
-        BotCommand(command="language", description="Language / Язык"),
-        BotCommand(command="rps", description="Rock-Paper-Scissors 🪨"),
-        BotCommand(command="dice", description="Roll dice 🎲"),
-        BotCommand(command="dart", description="Throw dart 🎯"),
-        BotCommand(command="bowling", description="Bowling 🎳"),
-        BotCommand(command="guess", description="Guess the number 🔢"),
-        BotCommand(command="trivia", description="Trivia quiz 🧠"),
-        BotCommand(command="joke", description="Random joke 😂"),
-        BotCommand(command="fact", description="Random fact 🧠"),
-        BotCommand(command="music", description="Search music 🎵"),
-        BotCommand(command="roll", description="Random number 🎲"),
-        BotCommand(command="hug", description="Hug someone 🤗"),
-        BotCommand(command="top", description="Leaderboard 🏆"),
-        BotCommand(command="stats", description="Your stats 📊"),
+        BotCommand(command="zombies", description="Clean dead accounts 🧟"),
+        BotCommand(command="bansticker", description="Ban sticker set 🚫"),
     ]
 
     await bot.set_my_commands(private_commands, scope=BotCommandScopeDefault())
-    logger.info("Bot commands set")
+    await bot.set_my_commands(user_group_commands, scope=BotCommandScopeAllGroupChats())
+    await bot.set_my_commands(admin_group_commands, scope=BotCommandScopeAllChatAdministrators())
+    logger.info("Bot commands set (private=%d, group_user=%d, group_admin=%d)",
+                len(private_commands), len(user_group_commands), len(admin_group_commands))
 
 
 PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"

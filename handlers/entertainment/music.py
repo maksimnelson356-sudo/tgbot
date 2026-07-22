@@ -27,24 +27,24 @@ router.name = "music"
 RESULTS_PER_PAGE = 5
 CACHE_TTL = 300
 
-# Cache: short_key -> (timestamp, query, tracks)
-_cache: dict[str, tuple[float, str, list]] = {}
+# Cache: short_key -> (timestamp, query, tracks, user_id)
+_cache: dict[str, tuple[float, str, list, int]] = {}
 
 
 def _cache_key(query: str) -> str:
     return hashlib.md5(query.encode()).hexdigest()[:8]
 
 
-def _put_cache(query: str, tracks: list) -> str:
+def _put_cache(query: str, tracks: list, user_id: int) -> str:
     key = _cache_key(query)
-    _cache[key] = (time.time(), query, tracks)
+    _cache[key] = (time.time(), query, tracks, user_id)
     return key
 
 
 def _get_cache(key: str) -> Optional[tuple]:
     entry = _cache.get(key)
     if entry and time.time() - entry[0] < CACHE_TTL:
-        return entry[1], entry[2]
+        return entry[1], entry[2], entry[3]
     return None
 
 
@@ -81,6 +81,7 @@ def _build_results_keyboard(tracks: list, cache_key: str, page: int = 0) -> Inli
 
 async def _do_search(message: Message, query: str) -> None:
     lang = await get_user_lang(message)
+    user_id = message.from_user.id if message.from_user else 0
     searching = await message.answer(t("music_searching", lang, query=query))
 
     tracks = await search(query, limit=20)
@@ -89,7 +90,7 @@ async def _do_search(message: Message, query: str) -> None:
         await searching.edit_text(t("music_not_found", lang, query=query))
         return
 
-    key = _put_cache(query, tracks)
+    key = _put_cache(query, tracks, user_id)
     kb = _build_results_keyboard(tracks, key, page=0)
     await searching.edit_text(
         f"🎶 <b>{query}</b> — {len(tracks)} треков:",
@@ -108,7 +109,11 @@ async def on_music_page(callback: CallbackQuery) -> None:
         await callback.answer("Результаты устарели, выполните поиск заново", show_alert=True)
         return
 
-    query, tracks = entry
+    query, tracks, owner_id = entry
+    if callback.from_user.id != owner_id:
+        await callback.answer("Это не твой поиск 🚫", show_alert=True)
+        return
+
     kb = _build_results_keyboard(tracks, cache_key, page=page)
     await callback.message.edit_reply_markup(reply_markup=kb)
     await callback.answer()
@@ -125,7 +130,11 @@ async def on_music_pick(callback: CallbackQuery) -> None:
         await callback.answer("Результаты устарели, выполните поиск заново", show_alert=True)
         return
 
-    query, tracks = entry
+    query, tracks, owner_id = entry
+    if callback.from_user.id != owner_id:
+        await callback.answer("Это не твой поиск 🚫", show_alert=True)
+        return
+
     if idx >= len(tracks):
         await callback.answer("Трек не найден", show_alert=True)
         return
