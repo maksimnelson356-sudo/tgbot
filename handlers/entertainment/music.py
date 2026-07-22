@@ -100,6 +100,16 @@ async def _do_search(message: Message, query: str) -> None:
         await searching.edit_text(t("music_not_found", lang, query=query))
         return
 
+    # Deduplicate by artist+title (case-insensitive)
+    seen = set()
+    unique_tracks = []
+    for tr in tracks:
+        key = f"{tr.artist.lower().strip()}|{tr.title.lower().strip()}"
+        if key not in seen:
+            seen.add(key)
+            unique_tracks.append(tr)
+    tracks = unique_tracks
+
     key = _put_cache(query, tracks, user_id)
     kb = _build_results_keyboard(tracks, key, page=0)
     await searching.edit_text(
