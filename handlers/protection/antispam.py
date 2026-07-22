@@ -1,3 +1,4 @@
+import logging
 import time
 
 from aiogram import Bot, Router, F
@@ -16,6 +17,8 @@ from db.queries import (
     mute_member,
 )
 from services.spam_detector import spam_detector
+
+logger = logging.getLogger(__name__)
 
 PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
 
