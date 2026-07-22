@@ -51,7 +51,7 @@ async def cmd_music(message: Message, state: FSMContext) -> None:
     """Search music. /music <query> or /music → ask for query."""
     lang = await get_user_lang(message)
     text = message.text or ""
-    query = text.removeprefix("/music").strip()
+    query = text.removeprefix("/music").removeprefix(f"/music@{message.bot.username}").strip()
 
     if query:
         await _do_search(message, query)
