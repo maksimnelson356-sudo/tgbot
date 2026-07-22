@@ -72,6 +72,9 @@
         tg.ready();
         tg.expand();
 
+        const params = new URLSearchParams(window.location.search);
+        const chatId = params.get('chat_id');
+
         const toggles = [
             { key: 'antispam_enabled', label: '🛡 Анти-спам', default: true },
             { key: 'moderation_enabled', label: '📝 Модерация', default: true },
@@ -101,8 +104,9 @@
 
                 sw.classList.toggle('on', newState);
 
-                const data = JSON.stringify({ action: 'toggle', key: t.key, value: newState });
-                tg.sendData(data);
+                const payload = { action: 'toggle', key: t.key, value: newState };
+                if (chatId) payload.chat_id = parseInt(chatId);
+                tg.sendData(JSON.stringify(payload));
 
                 status.textContent = `${t.label}: ${newState ? '✅ ВКЛ' : '❌ ВЫКЛ'}`;
                 setTimeout(() => { status.textContent = ''; }, 2000);

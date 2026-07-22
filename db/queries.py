@@ -510,6 +510,19 @@ async def get_user_any_admin_rank(session: AsyncSession, telegram_id: int) -> bo
     return result.scalar_one_or_none() is not None
 
 
+async def get_user_admin_chats(session: AsyncSession, telegram_id: int) -> list:
+    """Get all chats where user is a bot-level admin. Returns list of Chat objects."""
+    from db.models import ChatAdmin
+    stmt = (
+        select(Chat)
+        .join(ChatAdmin, ChatAdmin.chat_id == Chat.id)
+        .join(User, ChatAdmin.user_id == User.id)
+        .where(User.telegram_id == telegram_id, Chat.type.in_(("group", "supergroup")))
+    )
+    result = await session.execute(stmt)
+    return list(result.unique().scalars().all())
+
+
 async def list_banned_stickers(session: AsyncSession, chat_id: int) -> list[BannedSticker]:
     stmt = (
         select(BannedSticker)
@@ -529,12 +542,14 @@ async def add_scheduled_post(
     interval_hours: int,
     created_by: int,
     photo_file_id: Optional[str] = None,
+    media_type: Optional[str] = None,
 ) -> "ScheduledPost":
     from db.models import ScheduledPost
     post = ScheduledPost(
         chat_telegram_id=chat_telegram_id,
         text=text,
         photo_file_id=photo_file_id,
+        media_type=media_type,
         interval_hours=interval_hours,
         created_by=created_by,
     )

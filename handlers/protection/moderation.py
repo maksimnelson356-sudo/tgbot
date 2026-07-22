@@ -178,6 +178,18 @@ async def moderate_message(message: Message) -> None:
             if has_phone(text) or has_email(text):
                 reason = "Phone/email blocked"
 
+        # AI moderation (Gemini) — fallback if word-lists missed something
+        if reason is None and settings.get("moderation_enabled", True):
+            from config import settings as bot_settings
+            if bot_settings.GOOGLE_API_KEY:
+                try:
+                    from services.ai_moderation import check_text
+                    ai_result = await check_text(text)
+                    if ai_result and not ai_result.get("allowed", True):
+                        reason = f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
+                except Exception:
+                    pass
+
         if reason is not None:
             try:
                 await message.delete()
@@ -221,11 +233,7 @@ async def moderate_message(message: Message) -> None:
 
 @router.message(IsGroup(), F.photo | F.video | F.animation, ~F.text.startswith("/"))
 async def moderate_nsfw_media(message: Message) -> None:
-    """Check media messages for potential NSFW content.
-
-    Currently checks domain names in captions.
-    Full image-based NSFW detection can be added via external API.
-    """
+    """Check media messages for NSFW/ToS-violating content using AI."""
     if message.from_user is None:
         return
 
@@ -234,10 +242,6 @@ async def moderate_nsfw_media(message: Message) -> None:
         if member.status in ("creator", "administrator"):
             return
     except Exception:
-        return
-
-    text = (message.caption or "").lower()
-    if not text:
         return
 
     async with async_session_factory() as session:
@@ -253,32 +257,69 @@ async def moderate_nsfw_media(message: Message) -> None:
             return
 
         lang = await get_user_lang(message)
+        text = (message.caption or "").lower()
 
         # Check caption for NSFW words (with homoglyph normalization)
-        text_normalized = normalize_text(text)
-        for word in _NSFW_WORDS:
-            if word.lower() in text or word.lower() in text_normalized:
-                try:
-                    await message.delete()
-                except Exception:
-                    pass
+        if text:
+            text_normalized = normalize_text(text)
+            for word in _NSFW_WORDS:
+                if word.lower() in text or word.lower() in text_normalized:
+                    try:
+                        await message.delete()
+                    except Exception:
+                        pass
+                    await add_warning(session, chat.id, user.id, user.id, reason=f"NSFW caption: {word}")
+                    warn_count = await increment_warnings(session, chat.id, user.id)
+                    mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
+                    await message.answer(t("mod_warned", lang, user=mention, count=warn_count, reason=f"NSFW: {word}"))
+                    return
 
-                await add_warning(session, chat.id, user.id, user.id, reason=f"NSFW caption: {word}")
-                warn_count = await increment_warnings(session, chat.id, user.id)
-                max_warnings = settings.get("max_warnings", 3)
+            # Check caption for NSFW domains
+            for domain in _NSFW_DOMAINS:
+                if domain in text:
+                    try:
+                        await message.delete()
+                    except Exception:
+                        pass
+                    return
 
-                mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
-                await message.answer(t("mod_warned", lang, user=mention, count=warn_count, reason=f"NSFW: {word}"))
-                return
-
-        # Check caption for NSFW domains
-        for domain in _NSFW_DOMAINS:
-            if domain in text:
-                try:
-                    await message.delete()
-                except Exception:
-                    pass
-                return
+        # AI image analysis (Gemini Vision)
+        from config import settings as bot_settings
+        if bot_settings.GOOGLE_API_KEY and message.photo:
+            try:
+                from services.ai_moderation import check_photo_from_telegram
+                ai_result = await check_photo_from_telegram(message.bot, message.photo[-1].file_id)
+                if ai_result and not ai_result.get("allowed", True):
+                    reason = f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
+                    try:
+                        await message.delete()
+                    except Exception:
+                        pass
+                    await add_warning(session, chat.id, user.id, user.id, reason=reason)
+                    warn_count = await increment_warnings(session, chat.id, user.id)
+                    max_warnings = settings.get("max_warnings", 3)
+                    mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
+                    if warn_count >= max_warnings:
+                        mute_duration = settings.get("mute_duration", 900)
+                        await mute_member(session, chat.id, user.id, mute_duration)
+                        try:
+                            import datetime
+                            until_date = datetime.datetime.now() + datetime.timedelta(seconds=mute_duration)
+                            await message.bot.restrict_chat_member(
+                                chat_id=message.chat.id,
+                                user_id=message.from_user.id,
+                                permissions=ChatPermissions(can_send_messages=False),
+                                until_date=until_date,
+                            )
+                        except Exception:
+                            pass
+                        await message.answer(t("mod_muted", lang, user=mention, count=warn_count, reason=reason))
+                        await reset_warnings(session, chat.id, user.id)
+                    else:
+                        await message.answer(t("mod_warned", lang, user=mention, count=warn_count, reason=reason))
+                    return
+            except Exception:
+                pass
 
 
 # Anti-forward handler (catches ALL forwarded messages)

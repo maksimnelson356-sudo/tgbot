@@ -21,11 +21,48 @@ async def _scheduler_loop(bot) -> None:
                 for post in due_posts:
                     try:
                         if post.photo_file_id:
-                            await bot.send_photo(
-                                chat_id=post.chat_telegram_id,
-                                photo=post.photo_file_id,
-                                caption=post.text,
-                            )
+                            media_type = getattr(post, "media_type", None) or "photo"
+                            if media_type == "video":
+                                await bot.send_video(
+                                    chat_id=post.chat_telegram_id,
+                                    video=post.photo_file_id,
+                                    caption=post.text,
+                                )
+                            elif media_type == "animation":
+                                await bot.send_animation(
+                                    chat_id=post.chat_telegram_id,
+                                    animation=post.photo_file_id,
+                                    caption=post.text,
+                                )
+                            elif media_type == "voice":
+                                await bot.send_voice(
+                                    chat_id=post.chat_telegram_id,
+                                    voice=post.photo_file_id,
+                                    caption=post.text,
+                                )
+                            elif media_type == "audio":
+                                await bot.send_audio(
+                                    chat_id=post.chat_telegram_id,
+                                    audio=post.photo_file_id,
+                                    caption=post.text,
+                                )
+                            elif media_type == "video_note":
+                                await bot.send_video_note(
+                                    chat_id=post.chat_telegram_id,
+                                    video_note=post.photo_file_id,
+                                )
+                            elif media_type == "document":
+                                await bot.send_document(
+                                    chat_id=post.chat_telegram_id,
+                                    document=post.photo_file_id,
+                                    caption=post.text,
+                                )
+                            else:
+                                await bot.send_photo(
+                                    chat_id=post.chat_telegram_id,
+                                    photo=post.photo_file_id,
+                                    caption=post.text,
+                                )
                         else:
                             await bot.send_message(
                                 chat_id=post.chat_telegram_id,

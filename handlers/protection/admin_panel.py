@@ -1,8 +1,6 @@
-import asyncio
-
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from db.base import async_session_factory
@@ -13,6 +11,8 @@ from filters.admin import HasRank
 from filters.chat_type import IsGroup
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
+
+PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
 
 router = Router()
 router.name = "admin_panel"
@@ -72,18 +72,10 @@ async def cmd_admin(message: Message) -> None:
         statuses.append(f"{t(label_key, lang)}: {status}")
 
     builder = _build_admin_kb(lang)
-    panel = await message.answer(
+    await message.answer(
         t("admin_panel_title", lang, statuses="\n".join(statuses)),
         reply_markup=builder.as_markup(),
     )
-
-    async def _del():
-        await asyncio.sleep(45)
-        try:
-            await panel.delete()
-        except Exception:
-            pass
-    asyncio.create_task(_del())
 
 
 @router.callback_query(F.data.startswith("admin:"))
@@ -331,6 +323,34 @@ def _build_admin_kb(lang: str) -> InlineKeyboardBuilder:
 
 @router.message(Command("panel"), IsGroup(), HasRank(3))
 async def cmd_panel(message: Message) -> None:
-    """Tell the user to open the WebApp via the Menu button."""
+    """Tell the user to open the WebApp via the Menu button (in group)."""
     lang = await get_user_lang(message)
     await message.answer(t("panel_title", lang))
+
+
+@router.message(Command("panel"), F.chat.type == "private")
+async def cmd_panel_dm(message: Message) -> None:
+    """Show groups list with WebApp buttons (in DM)."""
+    lang = await get_user_lang(message)
+
+    async with async_session_factory() as session:
+        from db.queries import get_user_admin_chats, get_or_create_user
+        user = await get_or_create_user(session, telegram_id=message.from_user.id)
+        admin_chats = await get_user_admin_chats(session, message.from_user.id)
+
+    if not admin_chats:
+        await message.answer(t("panel_no_groups", lang))
+        return
+
+    buttons = []
+    for chat in admin_chats:
+        title = chat.title or f"Chat {chat.telegram_id}"
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"⚙️ {title}",
+                web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={chat.telegram_id}"),
+            )
+        ])
+
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await message.answer(t("panel_dm_title", lang), reply_markup=kb)

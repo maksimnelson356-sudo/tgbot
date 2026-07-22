@@ -182,6 +182,7 @@ class ScheduledPost(Base):
     chat_telegram_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     text: Mapped[str] = mapped_column(Text)
     photo_file_id: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    media_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     interval_hours: Mapped[int] = mapped_column(Integer, nullable=False)
     last_sent_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[int] = mapped_column(BigInteger, nullable=False)

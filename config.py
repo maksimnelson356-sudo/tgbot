@@ -37,5 +37,8 @@ class Settings(BaseSettings):
     BOT_USERNAME: str = ""
     BOT_LANGUAGE: str = "ru"
 
+    # AI moderation
+    GOOGLE_API_KEY: str = ""
+
 
 settings = Settings()  # type: ignore[call-arg]

@@ -67,11 +67,23 @@ async def on_schedule_photo(message: Message, state: FSMContext) -> None:
     lang = await get_user_lang(message)
 
     if message.photo:
-        await state.update_data(photo_file_id=message.photo[-1].file_id)
+        await state.update_data(media_file_id=message.photo[-1].file_id, media_type="photo")
+    elif message.video:
+        await state.update_data(media_file_id=message.video.file_id, media_type="video")
+    elif message.animation:
+        await state.update_data(media_file_id=message.animation.file_id, media_type="animation")
+    elif message.document:
+        await state.update_data(media_file_id=message.document.file_id, media_type="document")
+    elif message.voice:
+        await state.update_data(media_file_id=message.voice.file_id, media_type="voice")
+    elif message.audio:
+        await state.update_data(media_file_id=message.audio.file_id, media_type="audio")
+    elif message.video_note:
+        await state.update_data(media_file_id=message.video_note.file_id, media_type="video_note")
     elif message.text and message.text == t("skip", lang):
-        await state.update_data(photo_file_id=None)
+        await state.update_data(media_file_id=None, media_type=None)
     else:
-        await message.answer(t("schedule_ask_photo_again", lang))
+        await message.answer(t("schedule_ask_media_again", lang))
         return
 
     await message.answer(t("schedule_ask_interval", lang), reply_markup=_interval_kb())
@@ -92,9 +104,10 @@ async def on_schedule_interval(message: Message, state: FSMContext) -> None:
     await state.clear()
 
     post_text = data.get("text", "")
-    photo_file_id = data.get("photo_file_id")
+    media_file_id = data.get("media_file_id")
+    media_type = data.get("media_type")
 
-    if not post_text and not photo_file_id:
+    if not post_text and not media_file_id:
         await message.answer(t("schedule_empty", lang))
         return
 
@@ -105,7 +118,8 @@ async def on_schedule_interval(message: Message, state: FSMContext) -> None:
             text=post_text,
             interval_hours=interval,
             created_by=message.from_user.id,
-            photo_file_id=photo_file_id,
+            photo_file_id=media_file_id,
+            media_type=media_type,
         )
 
     await message.answer(
@@ -128,8 +142,9 @@ async def cmd_schedule_list(message: Message) -> None:
 
     lines = [t("schedule_list_title", lang)]
     for p in posts:
-        photo = "📷" if p.photo_file_id else "📝"
-        lines.append(f"• #{p.id} {photo} {p.text[:50] if p.text else '—'} (каждые {p.interval_hours}ч)")
+        _media_emoji = {"photo": "📷", "video": "🎬", "animation": "🎞", "document": "📄", "voice": "🎤", "audio": "🎵", "video_note": " circle "}
+        media = _media_emoji.get(p.media_type or "", "📎" if p.photo_file_id else "📝")
+        lines.append(f"• #{p.id} {media} {(p.text or '—')[:50]} (каждые {p.interval_hours}ч)")
     await message.answer("\n".join(lines))
 
 

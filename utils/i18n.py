@@ -126,8 +126,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         # Scheduler
         "schedule_ask_text": "📝 Введи текст сообщения (или нажми «Пропустить» если только фото):",
-        "schedule_ask_photo": "📷 Пришли фото (или нажми «Пропустить»):",
-        "schedule_ask_photo_again": "📷 Пришли фото или нажми «Пропустить»:",
+        "schedule_ask_photo": "📷 Пришли фото, видео, GIF, стикер, документ или нажми «Пропустить»:",
+        "schedule_ask_photo_again": "📷 Пришли медиа (фото/видео/GIF/документ/голосовое) или нажми «Пропустить»:",
+        "schedule_ask_media_again": "📷 Пришли медиа (фото/видео/GIF/документ/голосовое) или нажми «Пропустить»:",
         "schedule_ask_interval": "⏰ Через сколько часов повторять?",
         "schedule_invalid_interval": "❌ Введи число от 1 до 24",
         "schedule_empty": "❌ Текст и фото пустые. Создание отменено.",
@@ -143,6 +144,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "panel_title": "⚙️ <b>Панель управления</b>\n\nНажми кнопку <b>Menu</b> внизу чата, чтобы открыть панель.",
         "panel_button": "⚙️ Открыть панель",
         "panel_not_admin": "❌ Только админы могут управлять настройками.",
+        "panel_dm_title": "⚙️ <b>Выбери группу:</b>",
+        "panel_no_groups": "❌ Ты не админ ни в одной группе с ботом.",
 
         # Game names
         "game_rps": "🪨 Камень-Ножницы-Бумага",
@@ -282,8 +285,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         # Scheduler
         "schedule_ask_text": "📝 Enter message text (or press «Skip» if photo only):",
-        "schedule_ask_photo": "📷 Send a photo (or press «Skip»):",
-        "schedule_ask_photo_again": "📷 Send a photo or press «Skip»:",
+        "schedule_ask_photo": "📷 Send a photo, video, GIF, sticker, document or press «Skip»:",
+        "schedule_ask_photo_again": "📷 Send media (photo/video/GIF/document/voice) or press «Skip»:",
+        "schedule_ask_media_again": "📷 Send media (photo/video/GIF/document/voice) or press «Skip»:",
         "schedule_ask_interval": "⏰ Repeat every how many hours?",
         "schedule_invalid_interval": "❌ Enter a number from 1 to 24",
         "schedule_empty": "❌ Text and photo are empty. Cancelled.",
@@ -299,6 +303,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "panel_title": "⚙️ <b>Admin Panel</b>\n\nPress the <b>Menu</b> button at the bottom of the chat to open the panel.",
         "panel_button": "⚙️ Open panel",
         "panel_not_admin": "❌ Only admins can manage settings.",
+        "panel_dm_title": "⚙️ <b>Select a group:</b>",
+        "panel_no_groups": "❌ You are not an admin in any group with the bot.",
 
         # Game names
         "game_rps": "🪨 Rock-Paper-Scissors",
