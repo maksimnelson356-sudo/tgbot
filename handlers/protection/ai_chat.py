@@ -7,7 +7,7 @@ from aiogram.types import Message
 
 from db.base import async_session_factory
 from db.queries import get_or_create_chat
-from filters.chat_type import IsGroup
+from filters.chat_type import IsGroup, IsReplyToBot
 
 router = Router()
 router.name = "ai_chat"
@@ -15,17 +15,13 @@ router.name = "ai_chat"
 logger = logging.getLogger(__name__)
 
 
-@router.message(IsGroup(), F.text, ~F.text.startswith("/"), F.reply_to_message)
+@router.message(IsGroup(), IsReplyToBot(), F.text, ~F.text.startswith("/"))
 async def ai_chat_reply(message: Message) -> None:
     """Respond when someone replies to the bot's message and AI chat is enabled."""
     if message.from_user is None or message.text is None:
         return
-    if message.reply_to_message is None or message.reply_to_message.from_user is None:
-        return
-    if message.reply_to_message.from_user.id != message.bot.id:
-        return
 
-    logger.info("AI chat match: user=%s chat=%s text='%s'", message.from_user.id, message.chat.id, message.text[:80])
+    logger.info("AI chat: user=%s chat=%s text='%s'", message.from_user.id, message.chat.id, message.text[:80])
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
