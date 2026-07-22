@@ -6,8 +6,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from services.external_api import get_random_fact, get_random_joke, get_random_meme
-from services.meme_service import get_random_meme_bytes
+from services.external_api import get_random_fact, get_random_joke
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -39,12 +38,7 @@ _EN_FACTS = [
     "A single cloud can weigh over a million pounds.",
 ]
 
-_EN_MEMES = [
-    "https://i.imgur.com/3U5TQaJ.jpeg",
-    "https://i.imgur.com/QeWdgB4.jpeg",
-    "https://i.imgur.com/s9qW9ZC.jpeg",
-    "https://i.imgur.com/Kv2JNB9.jpeg",
-]
+
 
 # ── Russian content ──────────────────────────────────────────────────────────
 
@@ -78,16 +72,7 @@ _RU_FACTS = [
     "Около 8% ДНК человека состоит из древних вирусов.",
 ]
 
-_RU_MEMES = [
-    # Memes from accessible sources (not imgur — blocked in RU)
-    "https://i.pinimg.com/736x/3b/80/69/3b80690a601278336cf77f73336f7e5b.jpg",
-    "https://i.pinimg.com/736x/55/cb/76/55cb76262b6912a5790dc8a951bcc7a5.jpg",
-    "https://i.pinimg.com/736x/f7/7a/59/f77a59d2c2cff49ee8bd0b88cb802ca1.jpg",
-    "https://i.pinimg.com/736x/9c/c1/13/9cc1130e1c601a535289c49fcf07ea4b.jpg",
-    "https://i.pinimg.com/736x/1b/3e/3c/1b3e3c99a67b93c017b78554d6cbe2de.jpg",
-    "https://i.pinimg.com/736x/a6/b0/ca/a6b0ca5508c48fa636e2ba0c5a9c2621.jpg",
-    "https://i.pinimg.com/736x/2e/23/87/2e238768ae08b599f5f2a9ad01085ab6.jpg",
-]
+
 
 
 @router.message(Command("joke"))
@@ -102,38 +87,6 @@ async def cmd_joke(message: Message) -> None:
         except Exception:
             joke = random.choice(_EN_JOKES)
     await message.answer(f"{t('joke_title', lang)}\n\n{joke}")
-
-
-@router.message(Command("meme"))
-async def cmd_meme(message: Message) -> None:
-    """Send a random meme image."""
-    lang = await get_user_lang(message)
-    meme_url = None
-
-    if lang == "ru":
-        meme_url = random.choice(_RU_MEMES)
-    else:
-        try:
-            meme_url = await get_random_meme()
-            if not meme_url:
-                meme_url = random.choice(_EN_MEMES)
-        except Exception:
-            meme_url = random.choice(_EN_MEMES)
-
-    # Use local meme service — downloads and caches images locally
-    try:
-        meme_data = await get_random_meme_bytes(lang)
-        if meme_data:
-            await message.answer_photo(
-                photo=meme_data,
-                caption=t("meme_title", lang),
-            )
-            return
-    except Exception:
-        pass
-
-    # Last resort fallback
-    await message.answer(f"{t('meme_title', lang)}\n\n*Meme image unavailable*")
 
 
 @router.message(Command("fact"))

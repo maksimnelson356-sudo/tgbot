@@ -1,4 +1,4 @@
-"""External API clients for jokes, memes, and facts."""
+"""External API clients for jokes and facts."""
 
 import json
 import logging
@@ -27,25 +27,6 @@ async def get_random_joke() -> str:
         logger.warning("Failed to fetch joke: %s", e)
 
     raise ConnectionError("Could not fetch joke")
-
-
-async def get_random_meme() -> Optional[str]:
-    """Fetch a random meme image URL."""
-    import aiohttp
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "https://meme-api.com/gimme",
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data.get("url")
-    except Exception as e:
-        logger.warning("Failed to fetch meme: %s", e)
-
-    return None
 
 
 async def get_random_fact() -> str:

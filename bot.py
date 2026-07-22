@@ -7,7 +7,7 @@ from aiogram.enums import ParseMode
 
 from config import settings
 from db.base import init_db
-from services.meme_service import get_random_meme_bytes
+
 
 
 logger = logging.getLogger(__name__)
@@ -29,8 +29,8 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="guess", description="Guess the number 🔢"),
         BotCommand(command="trivia", description="Trivia quiz 🧠"),
         BotCommand(command="joke", description="Random joke 😂"),
-        BotCommand(command="meme", description="Random meme"),
         BotCommand(command="fact", description="Random fact 🧠"),
+        BotCommand(command="music", description="Search music 🎵"),
         BotCommand(command="roll", description="Random number 🎲"),
         BotCommand(command="hug", description="Hug someone 🤗"),
         BotCommand(command="top", description="Leaderboard 🏆"),
@@ -84,8 +84,8 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="guess", description="Guess the number 🔢"),
         BotCommand(command="trivia", description="Trivia quiz 🧠"),
         BotCommand(command="joke", description="Random joke 😂"),
-        BotCommand(command="meme", description="Random meme"),
         BotCommand(command="fact", description="Random fact 🧠"),
+        BotCommand(command="music", description="Search music 🎵"),
         BotCommand(command="roll", description="Random number 🎲"),
         BotCommand(command="hug", description="Hug someone 🤗"),
         BotCommand(command="top", description="Leaderboard 🏆"),
@@ -156,6 +156,7 @@ async def main() -> None:
     from handlers.protection.stats_daily import router as stats_daily_router
     from handlers.protection.birthdays import router as birthdays_router
     from handlers.entertainment.weather import router as weather_router
+    from handlers.entertainment.music import router as music_router
     from handlers.feedback import router as feedback_router
     from handlers.protection.setlog import router as setlog_router
     from handlers.protection.utilities import router as utilities_router
@@ -195,6 +196,7 @@ async def main() -> None:
     dp.include_router(stats_daily_router)
     dp.include_router(birthdays_router)
     dp.include_router(weather_router)
+    dp.include_router(music_router)
     dp.include_router(feedback_router)
     dp.include_router(setlog_router)
     dp.include_router(utilities_router)

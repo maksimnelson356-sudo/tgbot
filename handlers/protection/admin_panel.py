@@ -61,6 +61,7 @@ async def cmd_admin(message: Message) -> None:
         ("filter_links", "admin_links"),
         ("filter_media", "admin_media"),
         ("nsfw_filter_enabled", "admin_nsfw"),
+        ("bad_words_enabled", "admin_badwords"),
         ("antiforward_enabled", "admin_antiforward"),
         ("antispam_contacts", "admin_contacts"),
         ("captcha_enabled", "admin_captcha"),
@@ -110,6 +111,7 @@ async def admin_callback(callback: CallbackQuery) -> None:
         "toggle_links": "filter_links",
         "toggle_media": "filter_media",
         "toggle_nsfw": "nsfw_filter_enabled",
+        "toggle_badwords": "bad_words_enabled",
         "toggle_antiforward": "antiforward_enabled",
         "toggle_contacts": "antispam_contacts",
         "toggle_captcha": "captcha_enabled",
@@ -141,6 +143,7 @@ async def admin_callback(callback: CallbackQuery) -> None:
         ("filter_links", "admin_links"),
         ("filter_media", "admin_media"),
         ("nsfw_filter_enabled", "admin_nsfw"),
+        ("bad_words_enabled", "admin_badwords"),
         ("antiforward_enabled", "admin_antiforward"),
         ("antispam_contacts", "admin_contacts"),
         ("captcha_enabled", "admin_captcha"),
@@ -316,6 +319,7 @@ def _build_admin_kb(lang: str) -> InlineKeyboardBuilder:
     builder.button(text=t("admin_links", lang), callback_data="admin:toggle_links")
     builder.button(text=t("admin_media", lang), callback_data="admin:toggle_media")
     builder.button(text=t("admin_nsfw", lang), callback_data="admin:toggle_nsfw")
+    builder.button(text=t("admin_badwords", lang), callback_data="admin:toggle_badwords")
     builder.button(text=t("admin_captcha", lang), callback_data="admin:toggle_captcha")
     builder.button(text=t("admin_raid", lang), callback_data="admin:toggle_raid")
     builder.button(text=t("admin_close", lang), callback_data="admin:close")

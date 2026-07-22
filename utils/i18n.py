@@ -25,8 +25,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "  /trivia — Викторина 🧠\n\n"
             "😂 <b>Развлечения</b>\n"
             "  /joke — Шутка 😂\n"
-            "  /meme — Мем\n"
             "  /fact — Факт 🧠\n"
+            "  /music — Музыка 🎵\n"
             "  /roll — Случайное число 🎲\n\n"
             "📊 <b>Статистика</b>\n"
             "  /top — Таблица лидеров 🏆\n"
@@ -61,9 +61,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         # Fun
         "joke_title": "😂 <b>Случайная шутка</b>",
-        "meme_title": "😂 <b>Мем</b>",
         "fact_title": "🧠 <b>Знаешь ли ты?</b>",
         "roll_title": "🎲 <b>Бросок!</b>\n\nВыпало: <b>{number}</b>",
+
+        # Music
+        "music_usage": "🎵 Использование: /music <название>\nПример: /music Imagine Dragons Bones",
+        "music_searching": "🔍 Ищу: <b>{query}</b>...",
+        "music_not_found": "❌ Ничего не найдено по запросу: <b>{query}</b>",
+        "music_caption": "🎵 {duration}",
+        "music_too_large": "❌ Файл слишком большой для Telegram",
 
         # Admin
         "admin_panel_title": "⚙️ <b>Панель управления</b>\n\n{statuses}\n\nНажми для переключения:",
@@ -72,6 +78,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin_links": "🔗 Фильтр ссылок",
         "admin_media": "📷 Фильтр медиа",
         "admin_nsfw": "🔞 Фильтр 18+",
+        "admin_badwords": "🚫 Мат-фильтр",
         "admin_captcha": "🎭 CAPTCHA",
         "admin_raid": "⚠️ Рейд-режим",
         "admin_close": "❌ Закрыть",
@@ -146,8 +153,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "  /trivia — Trivia quiz 🧠\n\n"
             "😂 <b>Fun</b>\n"
             "  /joke — Random joke 😂\n"
-            "  /meme — Random meme\n"
             "  /fact — Random fact 🧠\n"
+            "  /music — Search music 🎵\n"
             "  /roll — Random number 🎲\n\n"
             "📊 <b>Stats</b>\n"
             "  /top — Leaderboard 🏆\n"
@@ -182,9 +189,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         # Fun
         "joke_title": "😂 <b>Random Joke</b>",
-        "meme_title": "😂 <b>Meme</b>",
         "fact_title": "🧠 <b>Did you know?</b>",
         "roll_title": "🎲 <b>Roll!</b>\n\nYou rolled: <b>{number}</b>",
+
+        # Music
+        "music_usage": "🎵 Usage: /music <query>\nExample: /music Imagine Dragons Bones",
+        "music_searching": "🔍 Searching: <b>{query}</b>...",
+        "music_not_found": "❌ Nothing found for: <b>{query}</b>",
+        "music_caption": "🎵 {duration}",
+        "music_too_large": "❌ File too large for Telegram",
 
         # Admin
         "admin_panel_title": "⚙️ <b>Панель управления</b>\n\n{statuses}\n\nНажми для переключения:",
@@ -193,6 +206,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "admin_links": "🔗 Фильтр ссылок",
         "admin_media": "📷 Фильтр медиа",
         "admin_nsfw": "🔞 Фильтр 18+",
+        "admin_badwords": "🚫 Мат-фильтр",
         "admin_captcha": "🎭 CAPTCHA",
         "admin_raid": "⚠️ Рейд-режим",
         "admin_close": "❌ Закрыть",
