@@ -1,106 +1,104 @@
-"""Music search and download via SoundCloud API."""
+"""Music search and download via yt-dlp (multiple sources)."""
 
 import io
 import logging
-import re
+import os
+import tempfile
 from dataclasses import dataclass
 from typing import Optional
-from urllib.parse import quote
 
-import aiohttp
+import yt_dlp
 
 logger = logging.getLogger(__name__)
+
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB Telegram limit
 
 
 @dataclass
 class MusicTrack:
-    track_id: int
     title: str
     artist: str
     duration: int
-    stream_url: str
-    permalink_url: str
-
-
-SOUNDCLOUD_CLIENT_ID = "a3e05fcd8b32746d0b06a49456740760"
-
-
-async def _get_client_id() -> str:
-    """Try to get fresh client_id from SoundCloud website."""
-    return SOUNDCLOUD_CLIENT_ID
+    webpage_url: str
 
 
 async def search(query: str, limit: int = 5) -> list[MusicTrack]:
-    """Search SoundCloud for tracks."""
-    client_id = await _get_client_id()
-    url = "https://api-v2.soundcloud.com/search/tracks"
-    params = {
-        "q": query,
-        "limit": limit,
-        "client_id": client_id,
-    }
+    """Search YouTube for tracks."""
+    def _search():
+        ydl_opts = {
+            "default_search": f"ytsearch{limit}",
+            "quiet": True,
+            "no_warnings": True,
+            "socket_timeout": 15,
+            "extractor_args": {
+                "youtube": {"player_client": ["android"]},
+            },
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+            if not info or not info.get("entries"):
+                return []
+            results = []
+            for entry in info["entries"]:
+                if entry is None:
+                    continue
+                title = entry.get("title", "Unknown")
+                duration = entry.get("duration", 0) or 0
+                url = entry.get("webpage_url", "")
+                results.append(MusicTrack(
+                    title=title,
+                    artist=title.split(" - ")[0] if " - " in title else title,
+                    duration=duration,
+                    webpage_url=url,
+                ))
+            return results
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as resp:
-                if resp.status != 200:
-                    logger.warning("SoundCloud search failed: %d", resp.status)
-                    return []
-
-                data = await resp.json()
-                collection = data.get("collection", [])
-
-                results = []
-                for t in collection:
-                    if not t.get("streamable"):
-                        continue
-                    track_id = t.get("id", 0)
-                    title = t.get("title", "Unknown")
-                    artist = t.get("user", {}).get("username", "Unknown")
-                    duration_ms = t.get("duration", 0)
-                    duration = duration_ms // 1000
-                    permalink = t.get("permalink_url", "")
-
-                    results.append(MusicTrack(
-                        track_id=track_id,
-                        title=title,
-                        artist=artist,
-                        duration=duration,
-                        stream_url="",
-                        permalink_url=permalink,
-                    ))
-
-                return results
-
-    except Exception as e:
-        logger.warning("SoundCloud search error: %s", e)
-        return []
+    loop = __import__("asyncio").get_event_loop()
+    return await loop.run_in_executor(None, _search)
 
 
 async def download_track(track: MusicTrack) -> Optional[io.BytesIO]:
-    """Download full track from SoundCloud."""
-    client_id = await _get_client_id()
+    """Download audio from YouTube."""
+    def _download():
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = os.path.join(tmpdir, "audio")
+            ydl_opts = {
+                "format": "bestaudio/best",
+                "outtmpl": output_path,
+                "postprocessors": [{
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }],
+                "quiet": True,
+                "no_warnings": True,
+                "socket_timeout": 30,
+                "extractor_args": {
+                    "youtube": {"player_client": ["android"]},
+                },
+            }
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([track.webpage_url])
 
-    # Get stream URL
-    api_url = f"https://api-v2.soundcloud.com/tracks/{track.track_id}/stream"
-    params = {"client_id": client_id}
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(api_url, params=params, allow_redirects=True) as resp:
-                if resp.status != 200:
-                    logger.warning("SoundCloud stream failed: %d", resp.status)
+                mp3_path = output_path + ".mp3"
+                if not os.path.exists(mp3_path):
                     return None
 
-                audio_data = await resp.read()
-                if len(audio_data) < 10000:
-                    logger.warning("SoundCloud track too small, likely error")
+                file_size = os.path.getsize(mp3_path)
+                if file_size > MAX_FILE_SIZE:
                     return None
 
-                buf = io.BytesIO(audio_data)
+                with open(mp3_path, "rb") as f:
+                    data = f.read()
+
+                buf = io.BytesIO(data)
                 buf.name = f"{track.artist} - {track.title}.mp3"
                 return buf
 
-    except Exception as e:
-        logger.warning("SoundCloud download error: %s", e)
-        return None
+            except Exception as e:
+                logger.warning("yt-dlp download error: %s", e)
+                return None
+
+    loop = __import__("asyncio").get_event_loop()
+    return await loop.run_in_executor(None, _download)

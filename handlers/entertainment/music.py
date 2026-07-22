@@ -13,7 +13,7 @@ from aiogram.types import (
     InlineKeyboardButton,
 )
 
-from services.music_service import search, download_track
+from services.music_service import search, download_track, MusicTrack
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
