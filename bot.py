@@ -207,6 +207,7 @@ async def main() -> None:
     # ── Register routers ─────────────────────────────────────────────────
     dp.include_router(start_router)
     dp.include_router(music_router)
+    dp.include_router(ai_chat_router)
     dp.include_router(antispam_router)
     dp.include_router(captcha_router)
     dp.include_router(admin_panel_router)
@@ -234,7 +235,6 @@ async def main() -> None:
     dp.include_router(utilities_router)
     dp.include_router(scheduler_router)
     dp.include_router(webapp_router)
-    dp.include_router(ai_chat_router)
 
     logger.info("Starting polling...")
     await dp.start_polling(bot)
