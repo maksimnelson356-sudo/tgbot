@@ -1,3 +1,4 @@
+from typing import Optional
 import hashlib
 import logging
 import time
@@ -40,7 +41,7 @@ def _put_cache(query: str, tracks: list) -> str:
     return key
 
 
-def _get_cache(key: str) -> tuple[str, list] | None:
+def _get_cache(key: str) -> Optional[tuple]:
     entry = _cache.get(key)
     if entry and time.time() - entry[0] < CACHE_TTL:
         return entry[1], entry[2]
