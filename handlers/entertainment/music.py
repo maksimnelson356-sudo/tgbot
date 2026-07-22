@@ -48,9 +48,13 @@ def _get_cache(key: str) -> Optional[tuple]:
     return None
 
 
-def _format_duration(seconds: int) -> str:
-    m, s = divmod(seconds, 60)
-    return f"{m}:{s:02d}"
+def _format_duration(duration) -> str:
+    if isinstance(duration, str):
+        return duration
+    if isinstance(duration, (int, float)) and duration > 0:
+        m, s = divmod(int(duration), 60)
+        return f"{m}:{s:02d}"
+    return "?"
 
 
 def _build_results_keyboard(tracks: list, cache_key: str, page: int = 0) -> InlineKeyboardMarkup:
