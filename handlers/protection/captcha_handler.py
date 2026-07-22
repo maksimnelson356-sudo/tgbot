@@ -3,7 +3,7 @@ from aiogram.types import ChatPermissions, Message, BufferedInputFile
 
 from db.base import async_session_factory
 from db.queries import get_or_create_chat, log_action
-from filters.chat_type import IsGroup
+from filters.chat_type import IsGroup, HasPendingCaptcha
 from services.captcha import create_challenge, verify, has_pending, _pending
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
@@ -61,7 +61,7 @@ async def send_captcha(chat_id: int, user_id: int, bot) -> None:
         raise exc
 
 
-@router.message(IsGroup(), F.text, ~F.text.startswith("/"))
+@router.message(HasPendingCaptcha(), IsGroup(), F.text, ~F.text.startswith("/"))
 async def on_captcha_answer(message: Message) -> None:
     """Catch text from users with pending CAPTCHA (no FSM needed)."""
     if message.from_user is None or message.text is None:
@@ -69,9 +69,6 @@ async def on_captcha_answer(message: Message) -> None:
 
     chat_id = message.chat.id
     user_id = message.from_user.id
-
-    if not has_pending(chat_id, user_id):
-        return
 
     lang = await get_user_lang(message)
     result = verify(chat_id, user_id, message.text.strip())

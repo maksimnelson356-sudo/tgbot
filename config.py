@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     BOT_USERNAME: str = ""
     BOT_LANGUAGE: str = "ru"
 
+    # Bot owner (used for /feedback)
+    OWNER_ID: int = 0
+
     # AI moderation
     GOOGLE_API_KEY: str = ""
 

@@ -1,6 +1,7 @@
 """Auto-reply to keywords. Admin sets up keyword → reply pairs."""
 
 from aiogram import Router, F
+from aiogram.filters import Filter
 from aiogram.filters import Command
 from aiogram.types import Message
 
@@ -13,6 +14,32 @@ router = Router()
 router.name = "autoresponder"
 
 SAVE_KEY = "autoreplies"  # stored in chat.settings JSON
+
+
+class HasMatchingAutoReply(Filter):
+    """Filter: message text matches at least one configured auto-reply keyword."""
+
+    async def __call__(self, message: Message) -> bool:
+        if message.from_user is None or message.text is None:
+            return False
+        try:
+            member = await message.chat.get_member(message.from_user.id)
+            if member.status in ("creator", "administrator"):
+                return False
+        except Exception:
+            return False
+
+        async with async_session_factory() as session:
+            chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+            replies = (chat.settings or {}).get(SAVE_KEY, {})
+            if not replies:
+                return False
+
+        text_lower = message.text.lower()
+        for kw in replies:
+            if kw in text_lower:
+                return True
+        return False
 
 
 @router.message(Command("addreply"), IsGroup(), HasRank(2))
@@ -71,23 +98,15 @@ async def cmd_listreplies(message: Message) -> None:
     await message.answer("\n".join(lines))
 
 
-@router.message(IsGroup(), F.text, ~F.text.startswith("/"))
+@router.message(HasMatchingAutoReply(), IsGroup(), F.text, ~F.text.startswith("/"))
 async def check_autoreply(message: Message) -> None:
     """Check incoming messages against auto-replies."""
     if message.from_user is None or message.text is None:
-        return
-    try:
-        member = await message.chat.get_member(message.from_user.id)
-        if member.status in ("creator", "administrator"):
-            return
-    except Exception:
         return
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         replies = (chat.settings or {}).get(SAVE_KEY, {})
-        if not replies:
-            return
 
     text_lower = message.text.lower()
     for kw, reply in replies.items():

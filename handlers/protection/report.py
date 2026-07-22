@@ -24,13 +24,20 @@ async def cmd_report(message: Message) -> None:
 
     reported_msg = message.reply_to_message
     reporter = message.from_user
+    if reporter is None:
+        return
     reported_user = reported_msg.from_user
 
     # Build report text
+    if reported_user:
+        offender_line = f"👤 Offender: {reported_user.first_name} (ID: {reported_user.id})"
+    else:
+        offender_line = "👤 Offender: anonymous/channel"
+
     report_text = (
         f"🚨 <b>Report!</b>\n\n"
         f"👤 Reporter: {reporter.first_name} (ID: {reporter.id})\n"
-        f"👤 Offender: {reported_user.first_name} (ID: {reported_user.id})\n"
+        f"{offender_line}\n"
         f"📝 Reason: {reason}\n"
         f"💬 <a href='{reported_msg.get_url()}'>Jump to message</a>"
     )

@@ -26,11 +26,13 @@ async def init_db() -> None:
         ActionLog,
         BannedSticker,
         Chat,
+        ChatAdmin,
         ChatMember,
         GameStats,
         MessageLog,
         Note,
         Reputation,
+        ScheduledPost,
         User,
         Warning,
     )

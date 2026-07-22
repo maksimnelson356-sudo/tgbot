@@ -99,10 +99,6 @@ async def moderate_message(message: Message) -> None:
     if message.from_user is None or message.text is None:
         return
 
-    from services.captcha import has_pending
-    if has_pending(message.chat.id, message.from_user.id):
-        return
-
     lang = await get_user_lang(message)
 
     try:

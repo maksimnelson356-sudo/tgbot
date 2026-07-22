@@ -85,12 +85,15 @@ async def get_or_create_chat(
             chat.settings = {
                 "antispam_enabled": True,
                 "moderation_enabled": True,
-            "captcha_enabled": False,
-            "raid_mode_enabled": True,
-            "bad_words": [],
-            "filter_links": False,
-            "filter_media": False,
-            "welcome_message": "Добро пожаловать!",
+                "captcha_enabled": False,
+                "raid_mode_enabled": True,
+                "bad_words": [],
+                "filter_links": False,
+                "filter_media": False,
+                "nsfw_filter_enabled": True,
+                "antiforward_enabled": False,
+                "antispam_contacts": False,
+                "welcome_message": "Добро пожаловать!",
             }
             changed = True
         if changed:

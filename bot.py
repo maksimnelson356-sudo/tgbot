@@ -171,11 +171,13 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 
-    # Auto-delete all bot messages in groups after 5 seconds
-    _orig_call = bot.__call__
+    # Auto-delete all bot messages in groups after 5 seconds.
+    # Patch Bot.__call__ (class-level) — instance-level monkey-patch
+    # doesn't work for dunder methods because Python resolves them on the type.
+    _orig_call = Bot.__call__
 
-    async def _auto_delete_call(method):
-        result = await _orig_call(method)
+    async def _auto_delete_call(self, method, **kwargs):
+        result = await _orig_call(self, method, **kwargs)
         try:
             from aiogram.methods.send_message import SendMessage
             if isinstance(method, SendMessage) and result:
@@ -186,7 +188,7 @@ async def main() -> None:
             pass
         return result
 
-    bot.__call__ = _auto_delete_call  # type: ignore
+    Bot.__call__ = _auto_delete_call  # type: ignore
 
     dp = Dispatcher()
 

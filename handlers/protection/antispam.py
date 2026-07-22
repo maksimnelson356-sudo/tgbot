@@ -3,8 +3,7 @@ import logging
 import time
 
 from aiogram import Bot, Router, F
-from aiogram.filters import CommandObject
-from aiogram.types import ChatMemberUpdated, MenuButtonWebApp, Message, WebAppInfo
+from aiogram.types import ChatMemberUpdated, Message
 
 from config import settings
 from db.base import async_session_factory
@@ -20,8 +19,6 @@ from db.queries import (
 from services.spam_detector import spam_detector
 
 logger = logging.getLogger(__name__)
-
-PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
 
 router = Router()
 router.name = "antispam"
@@ -162,9 +159,6 @@ async def on_bot_added(event: ChatMemberUpdated) -> None:
         return
 
     bot: Bot = event.bot
-
-    try:
-        menu_button = MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL))
-        await bot.set_chat_menu_button(menu_button=menu_button)
-    except Exception:
-        pass
+    # Note: setChatMenuButton only works in private chats (Telegram API limitation).
+    # In groups, the menu button must be set via the user's private chat with the bot.
+    logger.info("Bot added to chat: %s (%s)", event.chat.id, getattr(event.chat, "title", "?"))

@@ -24,3 +24,13 @@ class IsReplyToBot(Filter):
         if not message.reply_to_message or not message.reply_to_message.from_user:
             return False
         return message.reply_to_message.from_user.id == message.bot.id
+
+
+class HasPendingCaptcha(Filter):
+    """Filter: user has a pending CAPTCHA in this chat."""
+
+    async def __call__(self, message: Message) -> bool:
+        from services.captcha import has_pending
+        if message.from_user is None:
+            return False
+        return has_pending(message.chat.id, message.from_user.id)
