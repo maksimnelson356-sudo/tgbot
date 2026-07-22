@@ -1,5 +1,10 @@
 # VPS — Команды для управления ботом
 
+## Деплой (после git push)
+```bash
+cd /opt/tgbot && git pull origin main && systemctl restart tgbot
+```
+
 ## Бот
 ```bash
 systemctl restart tgbot          # Перезапустить бота
@@ -37,9 +42,20 @@ source venv/bin/activate
 pip install -r requirements.txt  # Установить/обновить зависимости
 ```
 
+## .env (проверка)
+```bash
+cat /opt/tgbot/.env              # Посмотреть переменные
+```
+
+Нужно:
+- `BOT_TOKEN=...`
+- `GOOGLE_API_KEY=AIza...`   ← ключ Google AI Studio
+- `OWNER_ID=<telegram_id>`   ← для /feedback
+
 ## База данных
 ```bash
-ls /opt/tgbot/tgbot.db           # Проверить existence БД
+ls -la /opt/tgbot/data/tgbot.db # Проверить existence БД
+sqlite3 /opt/tgbot/data/tgbot.db ".tables"  # Таблицы
 ```
 
 ## Файрвол
