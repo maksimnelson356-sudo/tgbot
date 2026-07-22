@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import ChatPermissions, Message
+from aiogram.types import ChatPermissions, Message, InputFile
 
 from db.base import async_session_factory
 from db.queries import get_or_create_chat, log_action
@@ -42,11 +42,23 @@ async def send_captcha(chat_id: int, user_id: int, bot) -> None:
     except Exception:
         pass
 
-    await bot.send_photo(
-        chat_id=chat_id,
-        photo=image,
-        caption=t("captcha_prompt", "ru"),
-    )
+    try:
+        await bot.send_photo(
+            chat_id=chat_id,
+            photo=InputFile(file=image, filename="captcha.png"),
+            caption=t("captcha_prompt", "ru"),
+        )
+    except Exception as exc:
+        # If captcha fails to send, unmute the user so they aren't stuck
+        try:
+            await bot.restrict_chat_member(
+                chat_id=chat_id,
+                user_id=user_id,
+                permissions=FULL_PERMISSIONS,
+            )
+        except Exception:
+            pass
+        raise exc
 
 
 @router.message(IsGroup(), F.text, ~F.text.startswith("/"))

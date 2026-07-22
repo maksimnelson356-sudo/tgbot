@@ -135,7 +135,7 @@ async def on_new_members(message: Message) -> None:
             # CAPTCHA or welcome
             name = member.first_name or member.username or str(member.id)
             welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
-            if chat.settings.get("captcha_enabled", True):
+        if chat.settings.get("captcha_enabled", False):
                 try:
                     sent = await message.answer(f"👋 {name}, {welcome_msg}")
                     asyncio.create_task(_delete_after(sent, 3.0))
