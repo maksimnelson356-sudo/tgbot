@@ -113,8 +113,8 @@ async def set_menu_buttons(bot: Bot) -> None:
 
     # Set DEFAULT menu button — shows "Open App" on bot's profile page
     try:
-        await bot.set_chat_menu_button(menu_button=menu_button)
-        logger.info("Default menu button set")
+        result = await bot.set_chat_menu_button(menu_button=menu_button)
+        logger.info("Default menu button result: %s", result)
     except Exception as e:
         logger.warning("Failed to set default menu button: %s", e)
 
@@ -124,9 +124,10 @@ async def set_menu_buttons(bot: Bot) -> None:
 
     for chat_id in chat_ids:
         try:
-            await bot.set_chat_menu_button(chat_id=chat_id, menu_button=menu_button)
+            result = await bot.set_chat_menu_button(chat_id=chat_id, menu_button=menu_button)
+            logger.info("Menu button set for chat %s: %s", chat_id, result)
         except Exception as e:
-            logger.debug("Failed to set menu button for chat %s: %s", chat_id, e)
+            logger.warning("Failed to set menu button for chat %s: %s", chat_id, e)
 
     logger.info("Menu buttons set for %d chats + default", len(chat_ids))
 
