@@ -57,6 +57,7 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="toprep", description="Reputation top 🏆"),
         BotCommand(command="rules", description="Chat rules 📜"),
         BotCommand(command="zombies", description="Clean dead accounts 🧟"),
+        BotCommand(command="music", description="Search music 🎵"),
         BotCommand(command="pin", description="Pin message 📌"),
         BotCommand(command="unpin", description="Unpin message 📌"),
         BotCommand(command="admins", description="List admins 👑"),
