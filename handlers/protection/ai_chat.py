@@ -20,18 +20,18 @@ async def ai_chat_reply(message: Message) -> None:
     """Respond when someone replies to the bot's message and AI chat is enabled."""
     if message.from_user is None or message.text is None:
         return
-
-    if message.reply_to_message is None:
-        return
-    if message.reply_to_message.from_user is None:
+    if message.reply_to_message is None or message.reply_to_message.from_user is None:
         return
     if message.reply_to_message.from_user.id != message.bot.id:
         return
+
+    logger.info("AI chat match: user=%s chat=%s text='%s'", message.from_user.id, message.chat.id, message.text[:80])
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         chat_settings = chat.settings or {}
         if not chat_settings.get("ai_chat_enabled", False):
+            logger.info("AI chat: ai_chat_enabled=False for chat=%s — skipping", message.chat.id)
             return
 
     from config import settings as bot_settings
@@ -39,11 +39,9 @@ async def ai_chat_reply(message: Message) -> None:
         logger.warning("GOOGLE_API_KEY not set, skipping AI chat")
         return
 
-    logger.info("AI chat: user=%s chat=%s text=%s", message.from_user.id, message.chat.id, message.text[:50])
-
     try:
         from services.ai_moderation import _GEMINI_URL
-        import aiohttp, json
+        import aiohttp
 
         payload = {
             "contents": [{"parts": [
