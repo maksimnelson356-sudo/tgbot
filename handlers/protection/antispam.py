@@ -78,10 +78,11 @@ async def on_chat_member_update(event: ChatMemberUpdated) -> None:
                 _raid_mode[chat_id] = True
                 _raid_timestamps[chat_id] = time.time()
 
-        # Welcome
+        # Welcome (20s delay)
         welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
         name = new_user.first_name or new_user.username or str(new_user.id)
         try:
+            await asyncio.sleep(20)
             sent = await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
             asyncio.create_task(_delete_after(sent, 3.0))
         except Exception:
