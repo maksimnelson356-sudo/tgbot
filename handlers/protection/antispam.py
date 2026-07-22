@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -28,6 +29,15 @@ router.name = "antispam"
 # In-memory raid tracking per chat
 _raid_mode: dict[int, bool] = {}
 _raid_timestamps: dict[int, float] = {}  # chat_id -> when raid was last activated
+
+
+async def _delete_after(message: Message, delay: float = 3.0) -> None:
+    """Delete a message after a delay."""
+    await asyncio.sleep(delay)
+    try:
+        await message.delete()
+    except Exception:
+        pass
 
 
 @router.chat_member()
@@ -79,7 +89,8 @@ async def on_chat_member_update(event: ChatMemberUpdated) -> None:
             welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
             name = new_user.first_name or new_user.username or str(new_user.id)
             try:
-                await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
+                sent = await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
+                asyncio.create_task(_delete_after(sent, 3.0))
             except Exception:
                 pass
             from handlers.protection.captcha_handler import send_captcha
@@ -91,7 +102,8 @@ async def on_chat_member_update(event: ChatMemberUpdated) -> None:
             welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
             name = new_user.first_name or new_user.username or str(new_user.id)
             try:
-                await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
+                sent = await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
+                asyncio.create_task(_delete_after(sent, 3.0))
             except Exception:
                 pass
 
@@ -128,7 +140,8 @@ async def on_new_members(message: Message) -> None:
             welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
             if chat.settings.get("captcha_enabled", True):
                 try:
-                    await message.answer(f"👋 {name}, {welcome_msg}")
+                    sent = await message.answer(f"👋 {name}, {welcome_msg}")
+                    asyncio.create_task(_delete_after(sent, 3.0))
                 except Exception:
                     pass
                 from handlers.protection.captcha_handler import send_captcha
@@ -138,7 +151,8 @@ async def on_new_members(message: Message) -> None:
                     pass
             else:
                 try:
-                    await message.answer(f"👋 {name}, {welcome_msg}")
+                    sent = await message.answer(f"👋 {name}, {welcome_msg}")
+                    asyncio.create_task(_delete_after(sent, 3.0))
                 except Exception:
                     pass
 
@@ -207,9 +221,10 @@ async def on_bot_added(event: ChatMemberUpdated) -> None:
         return
 
     bot: Bot = event.bot
+    chat_id = event.chat.id
 
     try:
         menu_button = MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL))
-        await bot.set_chat_menu_button(menu_button=menu_button)
+        await bot.set_chat_menu_button(chat_id=chat_id, menu_button=menu_button)
     except Exception:
         pass

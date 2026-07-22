@@ -330,6 +330,7 @@ async def cmd_panel(message: Message) -> None:
     try:
         from aiogram.types import MenuButtonWebApp, WebAppInfo
         await message.bot.set_chat_menu_button(
+            chat_id=message.chat.id,
             menu_button=MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL)),
         )
         await message.answer(t("panel_menu_set", lang))
