@@ -80,7 +80,8 @@ async def on_captcha_answer(message: Message) -> None:
             pass
 
         try:
-            await message.chat.restrict_chat_member(
+            await message.bot.restrict_chat_member(
+                chat_id=chat_id,
                 user_id=user_id,
                 permissions=FULL_PERMISSIONS,
             )
@@ -106,8 +107,8 @@ async def on_captcha_answer(message: Message) -> None:
         if info is None or info.get("attempts", 0) >= 3:
             await message.answer(t("captcha_too_many", lang, name=name))
             try:
-                await message.chat.ban_chat_member(user_id)
-                await message.chat.unban_chat_member(user_id)
+                await message.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+                await message.bot.unban_chat_member(chat_id=chat_id, user_id=user_id)
             except Exception:
                 pass
         else:
@@ -121,7 +122,7 @@ async def on_captcha_answer(message: Message) -> None:
             pass
         await message.answer(t("captcha_expired", lang))
         try:
-            await message.chat.ban_chat_member(user_id)
-            await message.chat.unban_chat_member(user_id)
+            await message.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+            await message.bot.unban_chat_member(chat_id=chat_id, user_id=user_id)
         except Exception:
             pass

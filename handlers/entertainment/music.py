@@ -187,7 +187,7 @@ async def cmd_music(message: Message, state: FSMContext) -> None:
         return
 
     prompt = await message.answer(t("music_ask_query", lang))
-    # Delete the prompt after 10s in groups
+    # Delete the prompt after 30s in groups
     if message.chat.type in ("group", "supergroup"):
         asyncio.create_task(_delete_later(prompt, 30.0))
     await state.set_state(MusicState.waiting_query)
