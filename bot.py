@@ -105,31 +105,14 @@ PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.htm
 
 
 async def set_menu_buttons(bot: Bot) -> None:
-    """Set the WebApp menu button — default for profile + per chat."""
-    from db.base import async_session_factory
-    from db.queries import get_all_chat_ids
-
+    """Set the WebApp menu button — default for all chats."""
     menu_button = MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL))
 
-    # Set DEFAULT menu button — shows "Open App" on bot's profile page
     try:
         result = await bot.set_chat_menu_button(menu_button=menu_button)
-        logger.info("Default menu button result: %s", result)
+        logger.info("Default menu button set: %s", result)
     except Exception as e:
         logger.warning("Failed to set default menu button: %s", e)
-
-    # Set for all known chats
-    async with async_session_factory() as session:
-        chat_ids = await get_all_chat_ids(session)
-
-    for chat_id in chat_ids:
-        try:
-            result = await bot.set_chat_menu_button(chat_id=chat_id, menu_button=menu_button)
-            logger.info("Menu button set for chat %s: %s", chat_id, result)
-        except Exception as e:
-            logger.warning("Failed to set menu button for chat %s: %s", chat_id, e)
-
-    logger.info("Menu buttons set for %d chats + default", len(chat_ids))
 
 
 async def on_startup(bot: Bot) -> None:

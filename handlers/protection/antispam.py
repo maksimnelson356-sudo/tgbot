@@ -193,10 +193,9 @@ async def on_bot_added(event: ChatMemberUpdated) -> None:
         return
 
     bot: Bot = event.bot
-    chat_id = event.chat.id
 
     try:
         menu_button = MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL))
-        await bot.set_chat_menu_button(chat_id=chat_id, menu_button=menu_button)
+        await bot.set_chat_menu_button(menu_button=menu_button)
     except Exception:
         pass

@@ -323,15 +323,13 @@ def _build_admin_kb(lang: str) -> InlineKeyboardBuilder:
 
 @router.message(Command("panel"), IsGroup(), HasRank(3))
 async def cmd_panel(message: Message) -> None:
-    """Try to set Menu button and inform user."""
+    """Try to set Menu button for all groups and inform user."""
     lang = await get_user_lang(message)
 
-    from config import settings as bot_settings
     PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
     try:
         from aiogram.types import MenuButtonWebApp, WebAppInfo
         await message.bot.set_chat_menu_button(
-            chat_id=message.chat.id,
             menu_button=MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL)),
         )
         await message.answer(t("panel_menu_set", lang))
