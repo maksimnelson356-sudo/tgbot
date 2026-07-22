@@ -205,10 +205,13 @@ async def main() -> None:
     dp.chat_join_request.middleware(LoggingMiddleware())
 
     # ── Register routers ─────────────────────────────────────────────────
+    # ORDER MATTERS:
+    # - music_router, ai_chat_router, captcha_router: handle specific text (FSM, replies, pending captcha)
+    # - autoresponder_router: catches text for auto-replies
+    # - moderation_router: catches ALL remaining group text — MUST BE LAST
     dp.include_router(start_router)
     dp.include_router(music_router)
     dp.include_router(ai_chat_router)
-    dp.include_router(antispam_router)
     dp.include_router(captcha_router)
     dp.include_router(admin_panel_router)
     dp.include_router(warnings_router)
@@ -217,7 +220,6 @@ async def main() -> None:
     dp.include_router(leaderboard_router)
     dp.include_router(info_router)
     dp.include_router(language_router)
-    dp.include_router(moderation_router)
     dp.include_router(report_router)
     dp.include_router(purge_router)
     dp.include_router(notes_router)
@@ -235,6 +237,8 @@ async def main() -> None:
     dp.include_router(utilities_router)
     dp.include_router(scheduler_router)
     dp.include_router(webapp_router)
+    dp.include_router(antispam_router)
+    dp.include_router(moderation_router)
 
     logger.info("Starting polling...")
     await dp.start_polling(bot)
