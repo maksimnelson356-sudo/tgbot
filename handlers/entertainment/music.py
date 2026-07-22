@@ -37,9 +37,10 @@ async def _do_search(message: Message, query: str) -> None:
         result.audio.seek(0)
         await message.answer_audio(
             audio=result.audio,
-            title=result.title,
+            title=f"{result.artist} - {result.title}",
+            performer=result.artist,
             duration=result.duration or None,
-            caption=t("music_caption", lang, duration=duration_str),
+            caption=t("music_caption", lang, artist=result.artist, title=result.title, duration=duration_str),
         )
         await searching.delete()
     except Exception:
