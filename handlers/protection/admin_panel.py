@@ -323,7 +323,7 @@ def _build_admin_kb(lang: str) -> InlineKeyboardBuilder:
 
 @router.message(Command("panel"), IsGroup(), HasRank(3))
 async def cmd_panel(message: Message) -> None:
-    """Show WebApp admin panel as inline button (menu button only works in DM)."""
+    """DM the user with a WebApp button (inline WebApp doesn't work in groups)."""
     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
     PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
     kb = InlineKeyboardMarkup(inline_keyboard=[[
@@ -332,7 +332,23 @@ async def cmd_panel(message: Message) -> None:
             web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={message.chat.id}"),
         )
     ]])
-    await message.answer("⚙️ Нажми кнопку ниже чтобы открыть панель управления:", reply_markup=kb)
+    try:
+        await message.answer(
+            "⚙️ Панель управления отправлена в личные сообщения.\n"
+            "Нажми кнопку ниже в чате с ботом:",
+            reply_markup=kb,
+        )
+    except Exception:
+        pass
+    # Also send directly to user's DM
+    try:
+        await message.bot.send_message(
+            chat_id=message.from_user.id,
+            text=f"⚙️ Панель управления — {message.chat.title or 'группа'}",
+            reply_markup=kb,
+        )
+    except Exception:
+        await message.answer("❌ Не удалось отправить в ЛС. Напиши боту /start в личных сообщениях.")
 
 
 @router.message(Command("panel"), F.chat.type == "private")

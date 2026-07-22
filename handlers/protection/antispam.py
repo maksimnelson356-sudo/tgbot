@@ -33,11 +33,8 @@ _raid_timestamps: dict[int, float] = {}  # chat_id -> when raid was last activat
 
 async def _delete_after(message: Message, delay: float = 3.0) -> None:
     """Delete a message after a delay."""
-    await asyncio.sleep(delay)
-    try:
-        await message.delete()
-    except Exception:
-        pass
+    from utils.helpers import delete_after as _da
+    await _da(message, delay)
 
 
 @router.chat_member()

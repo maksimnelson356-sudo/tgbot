@@ -1,7 +1,24 @@
+import asyncio
 import datetime
 from typing import Optional
 
-from aiogram.types import User as AiogramUser
+from aiogram import Bot
+from aiogram.enums import ChatType
+from aiogram.types import Message, User as AiogramUser
+
+
+async def delete_after(message: Message, delay: float = 5.0) -> None:
+    """Delete a message after a delay (in seconds)."""
+    await asyncio.sleep(delay)
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+
+def schedule_delete(message: Message, delay: float = 5.0) -> None:
+    """Schedule a message for deletion after a delay (non-blocking)."""
+    asyncio.create_task(delete_after(message, delay))
 
 
 def get_user_mention(user: AiogramUser) -> str:
