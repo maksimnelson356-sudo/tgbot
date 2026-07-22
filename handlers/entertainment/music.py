@@ -1,5 +1,7 @@
-from aiogram import Router
+from aiogram import Router, F
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
 
 from services.music_service import search_and_download
@@ -10,22 +12,17 @@ router = Router()
 router.name = "music"
 
 
+class MusicState(StatesGroup):
+    waiting_query = State()
+
+
 def _format_duration(seconds: int) -> str:
     m, s = divmod(seconds, 60)
     return f"{m}:{s:02d}"
 
 
-@router.message(Command("music"))
-async def cmd_music(message: Message) -> None:
-    """Search and send music from YouTube. Usage: /music <query>"""
+async def _do_search(message: Message, query: str) -> None:
     lang = await get_user_lang(message)
-    text = message.text or ""
-    query = text.removeprefix("/music").strip()
-
-    if not query:
-        await message.answer(t("music_usage", lang))
-        return
-
     searching = await message.answer(t("music_searching", lang, query=query))
 
     result = await search_and_download(query)
@@ -47,3 +44,33 @@ async def cmd_music(message: Message) -> None:
         await searching.delete()
     except Exception:
         await searching.edit_text(t("music_too_large", lang))
+
+
+@router.message(Command("music"))
+async def cmd_music(message: Message, state: FSMContext) -> None:
+    """Search music. /music <query> or /music → ask for query."""
+    lang = await get_user_lang(message)
+    text = message.text or ""
+    query = text.removeprefix("/music").strip()
+
+    if query:
+        await _do_search(message, query)
+        return
+
+    await message.answer(t("music_ask_query", lang))
+    await state.set_state(MusicState.waiting_query)
+
+
+@router.message(MusicState.waiting_query)
+async def on_music_query(message: Message, state: FSMContext) -> None:
+    """Handle the query after user was asked."""
+    if message.from_user is None:
+        return
+
+    text = message.text or ""
+    if text.startswith("/"):
+        await state.clear()
+        return
+
+    await state.clear()
+    await _do_search(message, text)

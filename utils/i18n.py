@@ -66,6 +66,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         # Music
         "music_usage": "🎵 Использование: /music <название>\nПример: /music Imagine Dragons Bones",
+        "music_ask_query": "🎵 Введи название песни:",
         "music_searching": "🔍 Ищу: <b>{query}</b>...",
         "music_not_found": "❌ Ничего не найдено по запросу: <b>{query}</b>",
         "music_caption": "🎵 {duration}",
@@ -194,6 +195,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 
         # Music
         "music_usage": "🎵 Usage: /music <query>\nExample: /music Imagine Dragons Bones",
+        "music_ask_query": "🎵 Enter a song name:",
         "music_searching": "🔍 Searching: <b>{query}</b>...",
         "music_not_found": "❌ Nothing found for: <b>{query}</b>",
         "music_caption": "🎵 {duration}",
