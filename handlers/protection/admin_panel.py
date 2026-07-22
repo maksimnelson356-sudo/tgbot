@@ -2,7 +2,7 @@ import asyncio
 
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message, WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from db.base import async_session_factory
@@ -329,17 +329,8 @@ def _build_admin_kb(lang: str) -> InlineKeyboardBuilder:
 
 # ── /panel — WebApp admin panel ─────────────────────────────────────────────
 
-PANEL_URL = "https://raw.githubusercontent.com/maksimnelson356-sudo/tgbot/main/static/admin_panel.html"
-
-
 @router.message(Command("panel"), IsGroup(), HasRank(3))
 async def cmd_panel(message: Message) -> None:
-    """Open the WebApp admin panel."""
+    """Tell the user to open the WebApp via the Menu button."""
     lang = await get_user_lang(message)
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text=t("panel_button", lang),
-            web_app=WebAppInfo(url=PANEL_URL),
-        )]
-    ])
-    await message.answer(t("panel_title", lang), reply_markup=kb)
+    await message.answer(t("panel_title", lang))

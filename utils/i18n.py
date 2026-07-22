@@ -140,8 +140,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "skip": "Пропустить",
 
         # WebApp
-        "panel_title": "⚙️ <b>Панель управления</b>\n\nНажми кнопку ниже, чтобы открыть мини-приложение:",
+        "panel_title": "⚙️ <b>Панель управления</b>\n\nНажми кнопку <b>Menu</b> внизу чата, чтобы открыть панель.",
         "panel_button": "⚙️ Открыть панель",
+        "panel_not_admin": "❌ Только админы могут управлять настройками.",
 
         # Game names
         "game_rps": "🪨 Камень-Ножницы-Бумага",
@@ -295,8 +296,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "skip": "Skip",
 
         # WebApp
-        "panel_title": "⚙️ <b>Admin Panel</b>\n\nPress the button below to open the mini-app:",
+        "panel_title": "⚙️ <b>Admin Panel</b>\n\nPress the <b>Menu</b> button at the bottom of the chat to open the panel.",
         "panel_button": "⚙️ Open panel",
+        "panel_not_admin": "❌ Only admins can manage settings.",
 
         # Game names
         "game_rps": "🪨 Rock-Paper-Scissors",

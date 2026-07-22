@@ -4,6 +4,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 
 from config import settings
 from db.base import init_db
@@ -100,6 +101,28 @@ async def set_bot_commands(bot: Bot) -> None:
     logger.info("Bot commands set")
 
 
+PANEL_URL = "https://raw.githubusercontent.com/maksimnelson356-sudo/tgbot/main/static/admin_panel.html"
+
+
+async def set_menu_buttons(bot: Bot) -> None:
+    """Set the WebApp menu button for all known chats."""
+    from db.base import async_session_factory
+    from db.queries import get_all_chat_ids
+
+    menu_button = MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL))
+
+    async with async_session_factory() as session:
+        chat_ids = await get_all_chat_ids(session)
+
+    for chat_id in chat_ids:
+        try:
+            await bot.set_chat_menu_button(chat_id=chat_id, menu_button=menu_button)
+        except Exception as e:
+            logger.debug("Failed to set menu button for chat %s: %s", chat_id, e)
+
+    logger.info("Menu buttons set for %d chats", len(chat_ids))
+
+
 async def on_startup(bot: Bot) -> None:
     """Initialize database and notify admins."""
     await init_db()
@@ -116,6 +139,9 @@ async def on_startup(bot: Bot) -> None:
     # Start scheduler
     from services.scheduler_service import start_scheduler
     start_scheduler(bot)
+
+    # Set WebApp menu button for all chats
+    await set_menu_buttons(bot)
 
 
 async def on_shutdown(bot: Bot) -> None:

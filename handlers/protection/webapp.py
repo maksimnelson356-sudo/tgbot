@@ -20,12 +20,9 @@ async def handle_webapp_data(message: Message) -> None:
     if message.from_user is None:
         return
 
-    if message.chat.type not in ("group", "supergroup"):
-        await message.answer("Эта панель работает только в группах.")
-        return
-
     if not await _check_admin(message):
-        await message.answer("Только админы могут управлять настройками.")
+        lang = await get_user_lang(message)
+        await message.answer(t("panel_not_admin", lang))
         return
 
     try:
@@ -72,15 +69,20 @@ async def handle_webapp_data(message: Message) -> None:
 
 
 async def _check_admin(message: Message) -> bool:
-    try:
-        member = await message.chat.get_member(message.from_user.id)
-        if member.status in ("creator", "administrator"):
-            return True
-    except Exception:
-        pass
-    async with async_session_factory() as session:
-        from db.queries import get_chat_admin_rank
-        chat_db = await get_or_create_chat(session, telegram_id=message.chat.id)
-        from db.queries import get_or_create_user
-        user = await get_or_create_user(session, telegram_id=message.from_user.id)
-        return await get_chat_admin_rank(session, chat_db.id, user.id) is not None
+    if message.chat.type in ("group", "supergroup"):
+        try:
+            member = await message.chat.get_member(message.from_user.id)
+            if member.status in ("creator", "administrator"):
+                return True
+        except Exception:
+            pass
+        async with async_session_factory() as session:
+            from db.queries import get_chat_admin_rank
+            chat_db = await get_or_create_chat(session, telegram_id=message.chat.id)
+            from db.queries import get_or_create_user
+            user = await get_or_create_user(session, telegram_id=message.from_user.id)
+            return await get_chat_admin_rank(session, chat_db.id, user.id) is not None
+    else:
+        async with async_session_factory() as session:
+            from db.queries import get_user_any_admin_rank
+            return await get_user_any_admin_rank(session, message.from_user.id)

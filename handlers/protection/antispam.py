@@ -1,8 +1,8 @@
 import time
 
-from aiogram import Router, F
+from aiogram import Bot, Router, F
 from aiogram.filters import CommandObject
-from aiogram.types import ChatMemberUpdated, Message
+from aiogram.types import ChatMemberUpdated, MenuButtonWebApp, Message, WebAppInfo
 
 from config import settings
 from db.base import async_session_factory
@@ -16,6 +16,8 @@ from db.queries import (
     mute_member,
 )
 from services.spam_detector import spam_detector
+
+PANEL_URL = "https://raw.githubusercontent.com/maksimnelson356-sudo/tgbot/main/static/admin_panel.html"
 
 router = Router()
 router.name = "antispam"
@@ -178,5 +180,23 @@ async def on_left_member(message: Message) -> None:
             await log_action(session, message.chat.id, message.left_chat_member.id, "left")
     try:
         await message.delete()
+    except Exception:
+        pass
+
+
+@router.my_chat_member()
+async def on_bot_added(event: ChatMemberUpdated) -> None:
+    """Set WebApp menu button when bot is added to a group."""
+    if event.new_chat_member.status not in ("member", "administrator"):
+        return
+    if event.old_chat_member.status in ("member", "administrator"):
+        return
+
+    bot: Bot = event.bot
+    chat_id = event.chat.id
+
+    try:
+        menu_button = MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL))
+        await bot.set_chat_menu_button(chat_id=chat_id, menu_button=menu_button)
     except Exception:
         pass

@@ -110,6 +110,12 @@ async def update_chat_settings(
     return chat
 
 
+async def get_all_chat_ids(session: AsyncSession) -> list[int]:
+    stmt = select(Chat.telegram_id)
+    result = await session.execute(stmt)
+    return [row[0] for row in result.all()]
+
+
 # ── Chat Member ───────────────────────────────────────────────────────────────
 
 async def get_chat_member(
@@ -492,6 +498,16 @@ async def list_chat_admins(session: AsyncSession, chat_id: int) -> list:
     )
     result = await session.execute(stmt)
     return list(result.all())
+
+
+async def get_user_any_admin_rank(session: AsyncSession, telegram_id: int) -> bool:
+    """Check if user is a bot-level admin in ANY chat."""
+    from db.models import ChatAdmin
+    stmt = select(ChatAdmin).join(User, ChatAdmin.user_id == User.id).where(
+        User.telegram_id == telegram_id
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none() is not None
 
 
 async def list_banned_stickers(session: AsyncSession, chat_id: int) -> list[BannedSticker]:
