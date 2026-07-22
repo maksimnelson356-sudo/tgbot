@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message, WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
@@ -11,6 +13,8 @@ from filters.admin import HasRank
 from filters.chat_type import IsGroup
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
+
+logger = logging.getLogger(__name__)
 
 PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
 
