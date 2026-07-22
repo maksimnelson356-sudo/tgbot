@@ -99,26 +99,47 @@ async def search(query: str, limit: int = 5) -> list[MusicTrack]:
 
 
 async def download_track(track: MusicTrack) -> Optional[io.BytesIO]:
-    """Download track from Hitmo."""
+    """Download track from Hitmo using session with cookies."""
     if not track.download_url:
         return None
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
         "Referer": "https://rus.hitmotop.com/",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
     }
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(track.download_url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            # Visit main page to get cookies
+            async with session.get("https://rus.hitmotop.com/", timeout=aiohttp.ClientTimeout(total=10)):
+                pass
+
+            async with session.get(track.download_url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 if resp.status != 200:
-                    logger.warning("Download failed: %d", resp.status)
+                    logger.warning("Download failed: %d (url: %s)", resp.status, track.download_url)
                     return None
 
+                content_type = resp.headers.get("Content-Type", "")
                 data = await resp.read()
                 if len(data) < 10000:
                     logger.warning("Downloaded file too small: %d bytes", len(data))
                     return None
+
+                # Determine extension from content type
+                ext = "mp3"
+                if "mpegurl" in content_type or ".m3u" in (resp.url.path if hasattr(resp.url, 'path') else ""):
+                    # It's an M3U playlist, need to download the actual file
+                    playlist_text = data.decode("utf-8", errors="ignore")
+                    m3u_match = re.search(r"(https?://\S+\.(?:mp3|m4a|ogg))", playlist_text)
+                    if m3u_match:
+                        async with session.get(m3u_match.group(1)) as resp2:
+                            if resp2.status == 200:
+                                data = await resp2.read()
 
                 buf = io.BytesIO(data)
                 buf.name = f"{track.artist} - {track.title}.mp3"
