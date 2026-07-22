@@ -68,8 +68,8 @@ async def cmd_admin(message: Message) -> None:
         ("bad_words_enabled", "admin_badwords"),
         ("antiforward_enabled", "admin_antiforward"),
         ("antispam_contacts", "admin_contacts"),
-        ("captcha_enabled", "admin_captcha"),
         ("raid_mode_enabled", "admin_raid"),
+        ("ai_chat_enabled", "admin_ai_chat"),
     ]:
         val = settings.get(key, True)
         status = t("on", lang) if val else t("off", lang)
@@ -110,8 +110,8 @@ async def admin_callback(callback: CallbackQuery) -> None:
         "toggle_badwords": "bad_words_enabled",
         "toggle_antiforward": "antiforward_enabled",
         "toggle_contacts": "antispam_contacts",
-        "toggle_captcha": "captcha_enabled",
         "toggle_raid": "raid_mode_enabled",
+        "toggle_ai_chat": "ai_chat_enabled",
     }
     setting_key = key_map.get(action)
     if setting_key is None:
@@ -142,8 +142,8 @@ async def admin_callback(callback: CallbackQuery) -> None:
         ("bad_words_enabled", "admin_badwords"),
         ("antiforward_enabled", "admin_antiforward"),
         ("antispam_contacts", "admin_contacts"),
-        ("captcha_enabled", "admin_captcha"),
         ("raid_mode_enabled", "admin_raid"),
+        ("ai_chat_enabled", "admin_ai_chat"),
     ]:
         val = settings.get(key, True)
         status = t("on", lang) if val else t("off", lang)
@@ -316,8 +316,10 @@ def _build_admin_kb(lang: str) -> InlineKeyboardBuilder:
     builder.button(text=t("admin_media", lang), callback_data="admin:toggle_media")
     builder.button(text=t("admin_nsfw", lang), callback_data="admin:toggle_nsfw")
     builder.button(text=t("admin_badwords", lang), callback_data="admin:toggle_badwords")
-    builder.button(text=t("admin_captcha", lang), callback_data="admin:toggle_captcha")
+    builder.button(text=t("admin_antiforward", lang), callback_data="admin:toggle_antiforward")
+    builder.button(text=t("admin_contacts", lang), callback_data="admin:toggle_contacts")
     builder.button(text=t("admin_raid", lang), callback_data="admin:toggle_raid")
+    builder.button(text=t("admin_ai_chat", lang), callback_data="admin:toggle_ai_chat")
     builder.button(text=t("admin_close", lang), callback_data="admin:close")
     builder.adjust(2)
     return builder

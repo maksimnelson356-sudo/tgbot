@@ -42,7 +42,7 @@ async def handle_webapp_data(message: Message) -> None:
         allowed_keys = {
             "antispam_enabled", "moderation_enabled", "filter_links",
             "filter_media", "nsfw_filter_enabled", "bad_words_enabled",
-            "captcha_enabled", "raid_mode_enabled", "antiforward_enabled",
+            "raid_mode_enabled", "antiforward_enabled",
             "antispam_contacts", "autoreplies_enabled", "ai_chat_enabled",
         }
         if key not in allowed_keys:
@@ -50,7 +50,8 @@ async def handle_webapp_data(message: Message) -> None:
             return
 
         async with async_session_factory() as session:
-            await update_chat_settings(session, message.chat.id, {key: value})
+            chat_db = await get_or_create_chat(session, telegram_id=message.chat.id)
+            await update_chat_settings(session, chat_db.id, {key: value})
 
         lang = await get_user_lang(message)
         status = t("on", lang) if value else t("off", lang)
@@ -62,7 +63,6 @@ async def handle_webapp_data(message: Message) -> None:
             "filter_media": "admin_media",
             "nsfw_filter_enabled": "admin_nsfw",
             "bad_words_enabled": "admin_badwords",
-            "captcha_enabled": "admin_captcha",
             "raid_mode_enabled": "admin_raid",
             "antiforward_enabled": "admin_antiforward",
             "antispam_contacts": "admin_contacts",
