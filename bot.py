@@ -189,6 +189,7 @@ async def main() -> None:
     from handlers.protection.utilities import router as utilities_router
     from handlers.protection.scheduler import router as scheduler_router
     from handlers.protection.webapp import router as webapp_router
+    from handlers.protection.ai_chat import router as ai_chat_router
 
     # ── Register middlewares ──────────────────────────────────────────────
     from middlewares.throttling import ThrottlingMiddleware
@@ -232,6 +233,7 @@ async def main() -> None:
     dp.include_router(utilities_router)
     dp.include_router(scheduler_router)
     dp.include_router(webapp_router)
+    dp.include_router(ai_chat_router)
 
     logger.info("Starting polling...")
     await dp.start_polling(bot)

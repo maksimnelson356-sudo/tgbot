@@ -42,7 +42,8 @@ async def handle_webapp_data(message: Message) -> None:
         allowed_keys = {
             "antispam_enabled", "moderation_enabled", "filter_links",
             "filter_media", "nsfw_filter_enabled", "bad_words_enabled",
-            "captcha_enabled", "raid_mode_enabled",
+            "captcha_enabled", "raid_mode_enabled", "antiforward_enabled",
+            "antispam_contacts", "autoreplies_enabled", "ai_chat_enabled",
         }
         if key not in allowed_keys:
             await message.answer("Неизвестная настройка.")
@@ -63,6 +64,10 @@ async def handle_webapp_data(message: Message) -> None:
             "bad_words_enabled": "admin_badwords",
             "captcha_enabled": "admin_captcha",
             "raid_mode_enabled": "admin_raid",
+            "antiforward_enabled": "admin_antiforward",
+            "antispam_contacts": "admin_contacts",
+            "autoreplies_enabled": "admin_autoreplies",
+            "ai_chat_enabled": "admin_ai_chat",
         }
         label = t(label_map.get(key, key), lang)
         await message.answer(f"{label}: {status}")
