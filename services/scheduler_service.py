@@ -82,7 +82,7 @@ async def _scheduler_loop(bot) -> None:
 def start_scheduler(bot) -> None:
     """Start the background scheduler task."""
     global _scheduler_task
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     _scheduler_task = loop.create_task(_scheduler_loop(bot))
     logger.info("Scheduler task created")
 

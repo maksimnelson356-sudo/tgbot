@@ -132,26 +132,8 @@ async def cmd_hug(message: Message) -> None:
         for part in parts:
             if part.startswith("@"):
                 username = part[1:].lower()
-                # Search in chat members
-                try:
-                    async for member in message.chat.get_members():
-                        if member.user.username and member.user.username.lower() == username:
-                            target = member.user
-                            break
-                except Exception:
-                    pass
-                # Fallback: search admins
                 if not target:
-                    try:
-                        admins = await message.chat.get_administrators()
-                        for a in admins:
-                            if a.user.username and a.user.username.lower() == username:
-                                target = a.user
-                                break
-                    except Exception:
-                        pass
-                if not target:
-                    text = f"🤗 <b>Обнимашки для @{username}!</b>" if lang != "ru" else f"🤗 <b>Обнимашки для @{username}!</b>"
+                    text = f"🤗 <b>Обнимашки для @{username}!</b>" if lang == "ru" else f"🤗 <b>Hug for @{username}!</b>"
                     await message.answer_animation(animation=hug_gif, caption=text)
                     return
 
