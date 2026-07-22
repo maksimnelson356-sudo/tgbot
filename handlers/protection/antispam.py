@@ -73,16 +73,22 @@ async def on_chat_member_update(event: ChatMemberUpdated) -> None:
 
         # CAPTCHA or welcome
         if chat.settings.get("captcha_enabled", True):
+            welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
+            name = new_user.first_name or new_user.username or str(new_user.id)
+            try:
+                await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
+            except Exception:
+                pass
             from handlers.protection.captcha_handler import send_captcha
             try:
                 await send_captcha(chat_id, user_id, event.bot)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to send captcha in %s: %s", chat_id, exc)
         else:
             welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
             name = new_user.first_name or new_user.username or str(new_user.id)
             try:
-                await event.answer(f"👋 {name}, {welcome_msg}")
+                await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
             except Exception:
                 pass
 
@@ -115,16 +121,21 @@ async def on_new_members(message: Message) -> None:
             await log_action(session, message.chat.id, member.id, "joined")
 
             # CAPTCHA or welcome
+            name = member.first_name or member.username or str(member.id)
+            welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
             if chat.settings.get("captcha_enabled", True):
+                try:
+                    await message.answer(f"👋 {name}, {welcome_msg}")
+                except Exception:
+                    pass
                 from handlers.protection.captcha_handler import send_captcha
                 try:
                     await send_captcha(message.chat.id, member.id, message.bot)
                 except Exception:
                     pass
             else:
-                name = member.first_name or member.username or str(member.id)
                 try:
-                    await message.answer(f"👋 {name}, Добро пожаловать!")
+                    await message.answer(f"👋 {name}, {welcome_msg}")
                 except Exception:
                     pass
 
