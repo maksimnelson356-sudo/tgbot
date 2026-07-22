@@ -30,13 +30,16 @@ async def ai_chat_reply(message: Message) -> None:
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
-        settings = chat.settings or {}
-        if not settings.get("ai_chat_enabled", False):
+        chat_settings = chat.settings or {}
+        if not chat_settings.get("ai_chat_enabled", False):
             return
 
     from config import settings as bot_settings
     if not bot_settings.GOOGLE_API_KEY:
+        logger.warning("GOOGLE_API_KEY not set, skipping AI chat")
         return
+
+    logger.info("AI chat: user=%s chat=%s text=%s", message.from_user.id, message.chat.id, message.text[:50])
 
     try:
         from services.ai_moderation import _GEMINI_URL
@@ -44,7 +47,7 @@ async def ai_chat_reply(message: Message) -> None:
 
         payload = {
             "contents": [{"parts": [
-                {"text": f"Ты умный и дружелюбный помощник в Telegram-группе. Отвечай кратко и по делу на русском языке. Не используй Markdown, просто_plain text.\n\nСообщение от @{message.from_user.username or message.from_user.first_name}: {message.text}"}
+                {"text": f"Ты умный и дружелюбный помощник в Telegram-группе. Отвечай кратко и по делу на русском языке. Не используй Markdown, просто plain text.\n\nСообщение от @{message.from_user.username or message.from_user.first_name}: {message.text}"}
             ]}],
             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 500},
         }
@@ -56,9 +59,12 @@ async def ai_chat_reply(message: Message) -> None:
                 timeout=aiohttp.ClientTimeout(total=15),
             ) as resp:
                 if resp.status != 200:
+                    body = await resp.text()
+                    logger.warning("Gemini API error %d: %s", resp.status, body[:200])
                     return
                 data = await resp.json()
                 reply_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 await message.answer(reply_text)
+                logger.info("AI chat reply sent to user=%s", message.from_user.id)
     except Exception as e:
-        logger.debug("AI chat error: %s", e)
+        logger.warning("AI chat error: %s", e)
