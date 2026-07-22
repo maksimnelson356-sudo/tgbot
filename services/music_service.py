@@ -46,9 +46,6 @@ async def search_and_download(query: str) -> Optional[MusicResult]:
                 "quiet": True,
                 "no_warnings": True,
                 "socket_timeout": 15,
-                "match_filter": yt_dlp.utils.match_filter_func(
-                    f"duration<={MAX_DURATION}"
-                ),
             }
 
             try:
@@ -94,11 +91,11 @@ async def search_and_download(query: str) -> Optional[MusicResult]:
                         url=url,
                     )
 
-            except yt_dlp.utils.MatchFailed:
-                logger.info("No results for query: %s", query)
-                return None
             except Exception as e:
-                logger.warning("Music download error: %s", e)
+                if "No results" in str(e) or "Match failed" in str(e):
+                    logger.info("No results for query: %s", query)
+                else:
+                    logger.warning("Music download error: %s", e)
                 return None
 
     loop = __import__("asyncio").get_event_loop()
