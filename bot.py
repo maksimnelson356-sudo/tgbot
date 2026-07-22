@@ -206,6 +206,7 @@ async def main() -> None:
 
     # ── Register routers ─────────────────────────────────────────────────
     dp.include_router(start_router)
+    dp.include_router(music_router)
     dp.include_router(antispam_router)
     dp.include_router(captcha_router)
     dp.include_router(admin_panel_router)
@@ -215,7 +216,6 @@ async def main() -> None:
     dp.include_router(leaderboard_router)
     dp.include_router(info_router)
     dp.include_router(language_router)
-    dp.include_router(music_router)
     dp.include_router(moderation_router)
     dp.include_router(report_router)
     dp.include_router(purge_router)
