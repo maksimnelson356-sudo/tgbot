@@ -32,8 +32,17 @@ git push origin main
 - `deploy/` — скрипты деплоя
 
 ## Порядок роутеров (КРИТИЧНО!)
-admin_panel и warnings ДОЛЖНЫ быть ДО moderation!
-Иначе текстовые команды (Повысить, Мут...) перехватываются moderation.
+moderation_router перехватывает ВЕСЬ текст в группах (~F.text.startswith("/"))!
+Поэтому он ДОЛЖЕН быть ПОСЛЕДНИМ роутером.
+
+Порядок в bot.py:
+1. music_router — FSM-состояние для /music
+2. ai_chat_router — ответы на реплаи к боту
+3. captcha_router — ответы на капчу
+4. admin_panel, warnings, games, fun, и т.д. — команды
+5. autoresponder_router — авто-ответы (текст)
+6. antispam_handler — ловит рейды, новые участники
+7. moderation_router — ПОСЛЕДНИЙ, перехватывает остаток текста
 
 ## Ранги
 1 = 🔰 Младший (Пред, Мут)
