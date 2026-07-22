@@ -146,6 +146,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "panel_not_admin": "❌ Только админы могут управлять настройками.",
         "panel_dm_title": "⚙️ <b>Выбери группу:</b>",
         "panel_no_groups": "❌ Ты не админ ни в одной группе с ботом.",
+        "panel_menu_set": "✅ Кнопка <b>Menu</b> установлена! Обнови чат (выйди и зайди снова) и нажми <b>Menu</b> внизу.",
 
         # Game names
         "game_rps": "🪨 Камень-Ножницы-Бумага",
@@ -305,6 +306,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "panel_not_admin": "❌ Only admins can manage settings.",
         "panel_dm_title": "⚙️ <b>Select a group:</b>",
         "panel_no_groups": "❌ You are not an admin in any group with the bot.",
+        "panel_menu_set": "✅ Menu button set! Refresh the chat (leave and rejoin) and press <b>Menu</b> at the bottom.",
 
         # Game names
         "game_rps": "🪨 Rock-Paper-Scissors",
