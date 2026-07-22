@@ -3,8 +3,8 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ChatType, ParseMode
-from aiogram.types import MenuButtonWebApp, Message, WebAppInfo
+from aiogram.enums import ParseMode
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 
 from config import settings
 from db.base import init_db
@@ -12,17 +12,6 @@ from db.base import init_db
 
 
 logger = logging.getLogger(__name__)
-
-_AUTO_DELETE_DELAY = 5.0  # seconds
-
-
-async def _auto_delete_message(message: Message, delay: float) -> None:
-    """Delete a message after a delay."""
-    await asyncio.sleep(delay)
-    try:
-        await message.delete()
-    except Exception:
-        pass
 
 
 async def set_bot_commands(bot: Bot) -> None:
@@ -164,20 +153,6 @@ async def main() -> None:
         token=settings.BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-
-    # Wrap send_message to auto-delete bot messages in groups after 5s
-    _original_send_message = bot.send_message
-
-    async def _auto_delete_send_message(*args, **kwargs):
-        result = await _original_send_message(*args, **kwargs)
-        chat_id = kwargs.get("chat_id") or (args[0] if args else None)
-        if chat_id and str(chat_id).startswith("-"):
-            # Skip inline keyboards — user needs time to click
-            if not kwargs.get("reply_markup"):
-                asyncio.create_task(_auto_delete_message(result, _AUTO_DELETE_DELAY))
-        return result
-
-    bot.send_message = _auto_delete_send_message  # type: ignore
 
     dp = Dispatcher()
 

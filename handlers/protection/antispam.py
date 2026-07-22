@@ -107,53 +107,11 @@ async def on_chat_member_update(event: ChatMemberUpdated) -> None:
 
 @router.message(F.new_chat_members)
 async def on_new_members(message: Message) -> None:
-    """Handle inline new_chat_members in message."""
+    """Handle inline new_chat_members — delete the service join message only."""
     if message.new_chat_members is None:
         return
 
-    for member in message.new_chat_members:
-        if member.is_bot:
-            continue
-
-        async with async_session_factory() as session:
-            await get_or_create_user(
-                session,
-                telegram_id=member.id,
-                username=member.username,
-                first_name=member.first_name,
-                last_name=member.last_name,
-            )
-            chat = await get_or_create_chat(
-                session,
-                telegram_id=message.chat.id,
-                title=getattr(message.chat, "title", None),
-                chat_type=message.chat.type,
-            )
-            await add_chat_member(session, chat.id, (await get_or_create_user(session, telegram_id=member.id)).id)
-            await log_action(session, message.chat.id, member.id, "joined")
-
-            # CAPTCHA or welcome
-            name = member.first_name or member.username or str(member.id)
-            welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
-            if chat.settings.get("captcha_enabled", False):
-                try:
-                    sent = await message.answer(f"👋 {name}, {welcome_msg}")
-                    asyncio.create_task(_delete_after(sent, 3.0))
-                except Exception:
-                    pass
-                from handlers.protection.captcha_handler import send_captcha
-                try:
-                    await send_captcha(message.chat.id, member.id, message.bot)
-                except Exception:
-                    pass
-            else:
-                try:
-                    sent = await message.answer(f"👋 {name}, {welcome_msg}")
-                    asyncio.create_task(_delete_after(sent, 3.0))
-                except Exception:
-                    pass
-
-    # Auto-delete service message if enabled
+    # Delete the "X joined the group" service message
     try:
         await message.delete()
     except Exception:
