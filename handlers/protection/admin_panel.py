@@ -327,34 +327,24 @@ def _build_admin_kb(lang: str) -> InlineKeyboardBuilder:
 
 @router.message(Command("panel"), IsGroup(), HasRank(3))
 async def cmd_panel(message: Message) -> None:
-    """Set WebApp menu button for this group."""
+    """Send WebApp panel button to user's DM."""
     PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
-    from aiogram.types import MenuButtonWebApp, WebAppInfo
-    try:
-        await message.bot.set_chat_menu_button(
-            chat_id=message.chat.id,
-            menu_button=MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL)),
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=f"⚙️ {message.chat.title or 'Группа'}",
+            web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={message.chat.id}"),
         )
-        await message.answer("✅ Кнопка меню установлена! Обнови чат и нажми Menu внизу.")
-    except Exception as e:
-        logger.warning("set_chat_menu_button failed for group %s: %s", message.chat.id, e)
-        # Fallback: send WebApp link to user's DM
-        from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-        kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(
-                text="⚙️ Открыть панель",
-                web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={message.chat.id}"),
-            )
-        ]])
-        try:
-            await message.bot.send_message(
-                chat_id=message.from_user.id,
-                text=f"⚙️ Панель управления — {message.chat.title or 'группа'}",
-                reply_markup=kb,
-            )
-            await message.answer("✅ Панель отправлена в личные сообщения.")
-        except Exception:
-            await message.answer("❌ Не удалось. Напиши боту /start в ЛС.")
+    ]])
+    try:
+        await message.bot.send_message(
+            chat_id=message.from_user.id,
+            text=f"⚙️ Панель управления — <b>{message.chat.title or 'группа'}</b>",
+            reply_markup=kb,
+        )
+        await message.answer("✅ Панель отправлена в личные сообщения.")
+    except Exception:
+        await message.answer("❌ Не удалось. Напиши боту /start в ЛС.")
 
 
 @router.message(Command("panel"), F.chat.type == "private")
