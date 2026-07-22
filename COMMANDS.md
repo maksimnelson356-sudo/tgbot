@@ -240,5 +240,5 @@
 | Переменная | Описание |
 |------------|----------|
 | `BOT_TOKEN` | Токен бота от @BotFather |
-| `GOOGLE_API_KEY` | API ключ Google AI Studio (`AIza...`) |
+| `GOOGLE_API_KEY` | API ключ Google AI Studio (`AIza...` или `AQ....`) |
 | `OWNER_ID` | Telegram ID владельца (для `/feedback`) |

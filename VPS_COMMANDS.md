@@ -49,7 +49,7 @@ cat /opt/tgbot/.env              # Посмотреть переменные
 
 Нужно:
 - `BOT_TOKEN=...`
-- `GOOGLE_API_KEY=AIza...`   ← ключ Google AI Studio
+- `GOOGLE_API_KEY=AIza... или AQ....`   ← ключ Google AI Studio
 - `OWNER_ID=<telegram_id>`   ← для /feedback
 
 ## База данных

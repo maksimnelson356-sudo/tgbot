@@ -23,7 +23,7 @@ git push origin main
 ## .env (VPS)
 ```
 BOT_TOKEN=...
-GOOGLE_API_KEY=AIza...   ← ключ Google AI Studio (не AQ.)
+GOOGLE_API_KEY=AIza... или AQ....  ← ключ Google AI Studio
 OWNER_ID=<telegram_id>   ← для /feedback, узнать через @userinfobot
 ```
 
@@ -99,5 +99,5 @@ moderation_router перехватывает ВЕСЬ текст в группа
 - `setChatMenuButton` **не работает** в группах (ограничение Telegram API)
 - `WebApp` кнопки **запрещены** в группах (BUTTON_TYPE_INVALID)
 - Капча **выключена** из панели админа и Mini App
-- Ключи в `.env`: `AIza...` (Google AI Studio), НЕ `AQ.` (устаревший)
+- Ключи Google AI Studio: `AIza...` (старый формат) или `AQ....` (новый формат) — оба рабочие
 - Кэш музыки: ключи по 8 символов, TTL 30 минут
