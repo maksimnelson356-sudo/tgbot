@@ -323,19 +323,16 @@ def _build_admin_kb(lang: str) -> InlineKeyboardBuilder:
 
 @router.message(Command("panel"), IsGroup(), HasRank(3))
 async def cmd_panel(message: Message) -> None:
-    """Try to set Menu button for all groups and inform user."""
-    lang = await get_user_lang(message)
-
+    """Show WebApp admin panel as inline button (menu button only works in DM)."""
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
     PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
-    try:
-        from aiogram.types import MenuButtonWebApp, WebAppInfo
-        await message.bot.set_chat_menu_button(
-            chat_id=message.chat.id,
-            menu_button=MenuButtonWebApp(text="⚙️ Панель", web_app=WebAppInfo(url=PANEL_URL)),
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="⚙️ Открыть панель",
+            web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={message.chat.id}"),
         )
-        await message.answer(t("panel_menu_set", lang))
-    except Exception as e:
-        await message.answer(f"❌ Ошибка: {e}")
+    ]])
+    await message.answer("⚙️ Нажми кнопку ниже чтобы открыть панель управления:", reply_markup=kb)
 
 
 @router.message(Command("panel"), F.chat.type == "private")
