@@ -4,9 +4,9 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, InputFile
 
-from services.music_service import search
+from services.music_service import search_and_download
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -29,7 +29,7 @@ async def _do_search(message: Message, query: str) -> None:
     lang = await get_user_lang(message)
     searching = await message.answer(t("music_searching", lang, query=query))
 
-    result = await search(query)
+    result = await search_and_download(query)
 
     if result is None:
         await searching.edit_text(t("music_not_found", lang, query=query))
@@ -38,24 +38,22 @@ async def _do_search(message: Message, query: str) -> None:
     duration_str = _format_duration(result.duration) if result.duration else "?"
 
     try:
-        buttons = []
-        if result.preview_url:
-            buttons.append([InlineKeyboardButton(text="▶️ Превью (30 сек)", url=result.preview_url)])
-        if result.url:
-            buttons.append([InlineKeyboardButton(text="🔗 Deezer", url=result.url)])
-        await message.answer(
-            text=t("music_caption", lang, artist=result.artist, title=result.title, duration=duration_str),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None,
+        result.audio.seek(0)
+        await message.answer_audio(
+            audio=InputFile(result.audio, filename=f"{result.artist} - {result.title}.mp3"),
+            title=result.title,
+            performer=result.artist,
+            duration=result.duration or None,
+            caption=f"🎵 {result.artist} — {result.title}\n⏱ {duration_str}",
         )
         await searching.delete()
     except Exception as e:
-        logger.warning("Failed to send music result: %s", e)
+        logger.warning("Failed to send audio: %s", e)
         await searching.edit_text(t("music_too_large", lang))
 
 
 @router.message(Command("music"))
 async def cmd_music(message: Message, state: FSMContext) -> None:
-    """Search music. /music <query> or /music → ask for query."""
     lang = await get_user_lang(message)
     text = message.text or ""
     bot_info = await message.bot.get_me()
@@ -71,7 +69,6 @@ async def cmd_music(message: Message, state: FSMContext) -> None:
 
 @router.message(MusicState.waiting_query)
 async def on_music_query(message: Message, state: FSMContext) -> None:
-    """Handle the query after user was asked."""
     if message.from_user is None:
         return
 
