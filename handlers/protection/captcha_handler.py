@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import ChatPermissions, Message, InputFile
+from aiogram.types import ChatPermissions, Message, BufferedInputFile
 
 from db.base import async_session_factory
 from db.queries import get_or_create_chat, log_action
@@ -45,7 +45,7 @@ async def send_captcha(chat_id: int, user_id: int, bot) -> None:
     try:
         await bot.send_photo(
             chat_id=chat_id,
-            photo=InputFile(file=image, filename="captcha.png"),
+            photo=BufferedInputFile(image.getvalue(), filename="captcha.png"),
             caption=t("captcha_prompt", "ru"),
         )
     except Exception as exc:
