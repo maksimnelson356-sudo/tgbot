@@ -17,7 +17,7 @@ from db.queries import (
 )
 from services.spam_detector import spam_detector
 
-PANEL_URL = "https://raw.githubusercontent.com/maksimnelson356-sudo/tgbot/main/static/admin_panel.html"
+PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
 
 router = Router()
 router.name = "antispam"

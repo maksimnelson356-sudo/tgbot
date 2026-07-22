@@ -101,7 +101,7 @@ async def set_bot_commands(bot: Bot) -> None:
     logger.info("Bot commands set")
 
 
-PANEL_URL = "https://raw.githubusercontent.com/maksimnelson356-sudo/tgbot/main/static/admin_panel.html"
+PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
 
 
 async def set_menu_buttons(bot: Bot) -> None:
