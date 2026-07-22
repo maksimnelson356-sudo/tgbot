@@ -81,28 +81,14 @@ async def on_chat_member_update(event: ChatMemberUpdated) -> None:
                 _raid_mode[chat_id] = True
                 _raid_timestamps[chat_id] = time.time()
 
-        # CAPTCHA or welcome
-        if chat.settings.get("captcha_enabled", True):
-            welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
-            name = new_user.first_name or new_user.username or str(new_user.id)
-            try:
-                sent = await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
-                asyncio.create_task(_delete_after(sent, 3.0))
-            except Exception:
-                pass
-            from handlers.protection.captcha_handler import send_captcha
-            try:
-                await send_captcha(chat_id, user_id, event.bot)
-            except Exception as exc:
-                logger.warning("Failed to send captcha in %s: %s", chat_id, exc)
-        else:
-            welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
-            name = new_user.first_name or new_user.username or str(new_user.id)
-            try:
-                sent = await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
-                asyncio.create_task(_delete_after(sent, 3.0))
-            except Exception:
-                pass
+        # Welcome
+        welcome_msg = chat.settings.get("welcome_message", "Добро пожаловать!")
+        name = new_user.first_name or new_user.username or str(new_user.id)
+        try:
+            sent = await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
+            asyncio.create_task(_delete_after(sent, 3.0))
+        except Exception:
+            pass
 
 
 @router.message(F.new_chat_members)
