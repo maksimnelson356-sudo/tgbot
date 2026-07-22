@@ -45,7 +45,11 @@ async def search_and_download(query: str) -> Optional[MusicResult]:
                 ],
                 "quiet": True,
                 "no_warnings": True,
-                "socket_timeout": 15,
+                "socket_timeout": 30,
+                "extractor_args": {
+                    "youtube": {"player_client": ["ios", "web"]},
+                },
+                "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
             }
 
             try:
