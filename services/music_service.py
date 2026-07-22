@@ -1,151 +1,116 @@
-"""Music search and download via SoundCloud."""
+"""Music search and download via JioSaavn API."""
 
 import io
-import json
 import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import unquote
 
 import aiohttp
 
 logger = logging.getLogger(__name__)
 
-_client_id_cache: Optional[str] = None
-
-
-async def _get_client_id(session: aiohttp.ClientSession) -> Optional[str]:
-    """Extract client_id from SoundCloud JS bundles."""
-    global _client_id_cache
-    if _client_id_cache:
-        return _client_id_cache
-
-    try:
-        # Get the main page to find JS bundle URLs
-        async with session.get("https://soundcloud.com") as resp:
-            if resp.status != 200:
-                return None
-            html = await resp.text()
-
-        # Find JS bundle URLs
-        js_urls = re.findall(r'(https://a\.sndcdn\.com/assets/app[^"]+\.js)', html)
-        if not js_urls:
-            return None
-
-        # Check bundles for client_id
-        for js_url in js_urls[:3]:
-            async with session.get(js_url) as resp:
-                if resp.status != 200:
-                    continue
-                js_text = await resp.text()
-                # Look for client_id pattern
-                match = re.search(r'client_id:"([a-zA-Z0-9]{32})"', js_text)
-                if match:
-                    _client_id_cache = match.group(1)
-                    logger.info("Extracted SoundCloud client_id: %s...", _client_id_cache[:8])
-                    return _client_id_cache
-
-        return None
-    except Exception as e:
-        logger.warning("Failed to get SoundCloud client_id: %s", e)
-        return None
-
 
 @dataclass
 class MusicTrack:
-    track_id: int
+    track_id: str
     title: str
     artist: str
     duration: int
-    stream_url: str
-    permalink_url: str
+    download_url: str
+    image_url: str
+
+
+def _clean_html(text: str) -> str:
+    """Remove HTML tags from text."""
+    return re.sub(r"<[^>]+>", "", text)
 
 
 async def search(query: str, limit: int = 5) -> list[MusicTrack]:
-    """Search SoundCloud for tracks."""
-    async with aiohttp.ClientSession() as session:
-        client_id = await _get_client_id(session)
-        if not client_id:
-            logger.warning("No SoundCloud client_id available")
-            return []
+    """Search JioSaavn for tracks."""
+    url = "https://www.jiosaavn.com/api.php"
+    params = {
+        "__call": "search.getResults",
+        "query": query,
+        "p": "1",
+        "n": str(limit),
+        "includeMetaTags": "1",
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36",
+    }
 
-        url = "https://api-v2.soundcloud.com/search/tracks"
-        params = {"q": query, "limit": limit, "client_id": client_id}
-
-        try:
-            async with session.get(url, params=params) as resp:
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, headers=headers) as resp:
                 if resp.status != 200:
-                    logger.warning("SoundCloud search failed: %d", resp.status)
+                    logger.warning("JioSaavn search failed: %d", resp.status)
                     return []
 
                 data = await resp.json()
-                collection = data.get("collection", [])
+                results = data.get("results", [])
+                tracks = []
 
-                results = []
-                for t in collection:
-                    if not t.get("streamable"):
-                        continue
-                    track_id = t.get("id", 0)
-                    title = t.get("title", "Unknown")
-                    artist = t.get("user", {}).get("username", "Unknown")
-                    duration_ms = t.get("duration", 0)
-                    duration = duration_ms // 1000
-                    track_auth = t.get("track_authorization", "")
-                    permalink = t.get("permalink_url", "")
+                for t in results:
+                    track_id = t.get("id", "")
+                    title = _clean_html(t.get("song", "Unknown"))
+                    artist = _clean_html(t.get("primary_artists", t.get("singers", "Unknown")))
+                    duration = int(t.get("duration", 0))
+                    image = t.get("image", "")
 
-                    results.append(MusicTrack(
+                    # Build download URL from song key
+                    encrypted_url = t.get("encrypted_media_url", "")
+                    if encrypted_url:
+                        dl_url = f"https://www.jiosaavn.com/api.php?__call=song.validateUrl&__={encrypted_url}"
+                    else:
+                        dl_url = ""
+
+                    tracks.append(MusicTrack(
                         track_id=track_id,
                         title=title,
                         artist=artist,
                         duration=duration,
-                        stream_url=track_auth,
-                        permalink_url=permalink,
+                        download_url=dl_url,
+                        image_url=image,
                     ))
 
-                    if len(results) >= limit:
-                        break
+                return tracks
 
-                return results
-
-        except Exception as e:
-            logger.warning("SoundCloud search error: %s", e)
-            return []
+    except Exception as e:
+        logger.warning("JioSaavn search error: %s", e)
+        return []
 
 
 async def download_track(track: MusicTrack) -> Optional[io.BytesIO]:
-    """Download full track from SoundCloud."""
-    async with aiohttp.ClientSession() as session:
-        client_id = await _get_client_id(session)
-        if not client_id:
-            return None
+    """Download full track from JioSaavn."""
+    if not track.download_url:
+        return None
 
-        try:
-            api_url = f"https://api-v2.soundcloud.com/tracks/{track.track_id}/stream"
-            params = {"client_id": client_id, "trackAuthorization": track.stream_url}
-
-            async with session.get(api_url, params=params) as resp:
+    try:
+        async with aiohttp.ClientSession() as session:
+            # First get the validated URL
+            async with session.get(track.download_url) as resp:
                 if resp.status != 200:
-                    logger.warning("SoundCloud stream API failed: %d", resp.status)
+                    return None
+                data = await resp.json()
+                media_url = data.get("results", {}).get("media_url", "")
+                if not media_url:
+                    return None
+                media_url = unquote(media_url)
+
+            # Download the actual audio
+            async with session.get(media_url) as resp:
+                if resp.status != 200:
+                    return None
+                audio_data = await resp.read()
+                if len(audio_data) < 10000:
                     return None
 
-                stream_data = await resp.json()
-                redirect_url = stream_data.get("url")
-                if not redirect_url:
-                    logger.warning("No stream URL in SoundCloud response")
-                    return None
+                buf = io.BytesIO(audio_data)
+                buf.name = f"{track.artist} - {track.title}.mp4"
+                return buf
 
-                async with session.get(redirect_url) as audio_resp:
-                    if audio_resp.status != 200:
-                        return None
-
-                    data = await audio_resp.read()
-                    if len(data) < 10000:
-                        return None
-
-                    buf = io.BytesIO(data)
-                    buf.name = f"{track.artist} - {track.title}.mp3"
-                    return buf
-
-        except Exception as e:
-            logger.warning("SoundCloud download error: %s", e)
-            return None
+    except Exception as e:
+        logger.warning("JioSaavn download error: %s", e)
+        return None
