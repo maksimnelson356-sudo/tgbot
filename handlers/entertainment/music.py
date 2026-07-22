@@ -4,7 +4,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, InputFile
+from aiogram.types import Message, BufferedInputFile
 
 from services.music_service import search_and_download
 from utils.i18n import t
@@ -39,8 +39,10 @@ async def _do_search(message: Message, query: str) -> None:
 
     try:
         result.audio.seek(0)
+        audio_bytes = result.audio.read()
+        file = BufferedInputFile(audio_bytes, filename=f"{result.artist} - {result.title}.mp3")
         await message.answer_audio(
-            audio=InputFile(result.audio, filename=f"{result.artist} - {result.title}.mp3"),
+            audio=file,
             title=result.title,
             performer=result.artist,
             duration=result.duration or None,
