@@ -1,8 +1,6 @@
 """External API clients for jokes and facts."""
 
-import json
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

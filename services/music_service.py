@@ -5,7 +5,6 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Optional
-from urllib.parse import quote
 
 import aiohttp
 from bs4 import BeautifulSoup

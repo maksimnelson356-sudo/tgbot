@@ -1,6 +1,7 @@
 """AI moderation service using Google Gemini — checks media and text for Telegram ToS violations."""
 
 import base64
+import json
 import logging
 from typing import Optional
 
@@ -57,7 +58,6 @@ async def check_text(text: str) -> Optional[dict]:
                 data = await resp.json()
                 text_out = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 text_out = text_out.removeprefix("```json").removesuffix("```").strip()
-                import json
                 return json.loads(text_out)
     except Exception as e:
         logger.warning("Gemini text check failed: %s", e)
@@ -94,7 +94,6 @@ async def check_photo(photo_bytes: bytes, mime_type: str = "image/jpeg") -> Opti
                 data = await resp.json()
                 text_out = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 text_out = text_out.removeprefix("```json").removesuffix("```").strip()
-                import json
                 return json.loads(text_out)
     except Exception as e:
         logger.warning("Gemini photo check failed: %s", e)

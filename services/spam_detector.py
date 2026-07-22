@@ -1,5 +1,5 @@
 import re
-from typing import Optional, Protocol
+from typing import Optional
 
 
 class SpamResult:
