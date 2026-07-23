@@ -2,7 +2,7 @@
 # deploy.sh — скрипт обновления бота
 # Вызывается вебхуком при пуше в репозиторий
 
-BOT_DIR="/root/tgbot"
+BOT_DIR="/opt/tgbot"
 LOG_FILE="/var/log/tgbot-deploy.log"
 
 echo "=== Deploy started: $(date) ===" >> "$LOG_FILE"

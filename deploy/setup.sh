@@ -4,7 +4,7 @@
 
 set -e
 
-BOT_DIR="/root/tgbot"
+BOT_DIR="/opt/tgbot"
 REPO_URL="https://github.com/maksimnelson356-sudo/tgbot.git"
 
 echo "=== Setting up TG Bot ==="
