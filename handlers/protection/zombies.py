@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from aiogram import Router
@@ -62,14 +63,16 @@ async def cmd_zombies(message: Message) -> None:
                 except Exception:
                     pass
 
-            # Update status every 500 members
-            if count % 500 == 0:
+            # Update status every 3000 members (avoid flood)
+            if count % 3000 == 0:
                 try:
                     await status_msg.edit_text(
                         f"🔍 Сканирование... {count} участников проверено, {kicked} удалено"
                     )
                 except Exception:
                     pass
+
+        await asyncio.sleep(5)
 
         await status_msg.edit_text(
             f"✅ <b>Zombie cleanup complete!</b>\n"
