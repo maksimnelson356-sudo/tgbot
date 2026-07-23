@@ -140,12 +140,18 @@ async def on_startup(bot: Bot) -> None:
     from services.scheduler_service import start_scheduler
     start_scheduler(bot)
 
+    # Start Telethon client (for /zombies, member scanning)
+    from services.telethon_client import get_client
+    await get_client()
+
     # Set WebApp menu button for all chats
     await set_menu_buttons(bot)
 
 
 async def on_shutdown(bot: Bot) -> None:
     """Cleanup on shutdown."""
+    from services.telethon_client import stop_client
+    await stop_client()
     logger.info("Bot shutting down...")
 
 

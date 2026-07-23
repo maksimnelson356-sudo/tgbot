@@ -5,6 +5,10 @@
 data/
 *.db
 
+# Telethon sessions
+*.session
+*.session-journal
+
 # Python
 __pycache__/
 *.py[cod]
