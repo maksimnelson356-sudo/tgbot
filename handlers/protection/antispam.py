@@ -67,7 +67,7 @@ async def on_chat_member_update(event: ChatMemberUpdated) -> None:
         )
 
         await add_chat_member(session, chat.id, user.id)
-        await log_action(session, chat_id, user_id, "joined")
+        await log_action(session, chat.id, user.id, "joined")
 
         # Raid detection
         if chat.settings.get("raid_mode_enabled", True):
@@ -134,7 +134,7 @@ async def raid_mode_protection(message: Message) -> None:
                 )
                 await mute_member(session, chat.id, user.id, 3600)
                 await log_action(
-                    session, chat_id, message.from_user.id,
+                    session, chat.id, user.id,
                     "muted", details="Raid mode: high spam score",
                 )
 
@@ -144,7 +144,11 @@ async def on_left_member(message: Message) -> None:
     """Handle members leaving and auto-delete the service message."""
     if message.left_chat_member and not message.left_chat_member.is_bot:
         async with async_session_factory() as session:
-            await log_action(session, message.chat.id, message.left_chat_member.id, "left")
+            user = await get_or_create_user(
+                session, telegram_id=message.left_chat_member.id,
+            )
+            chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+            await log_action(session, chat.id, user.id, "left")
     try:
         await message.delete()
     except Exception:

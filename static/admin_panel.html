@@ -95,15 +95,17 @@
         toggles.forEach(t => {
             const item = document.createElement('div');
             item.className = 'toggle-item';
+            const urlVal = params.get(t.key);
+            const isOn = urlVal !== null ? urlVal === '1' : t.default;
             item.innerHTML = `
                 <span class="toggle-label">${t.label}</span>
-                <div class="toggle-switch" id="sw_${t.key}"></div>
+                <div class="toggle-switch${isOn ? ' on' : ''}" id="sw_${t.key}"></div>
             `;
             item.addEventListener('click', () => {
                 tg.HapticFeedback.impactOccurred('light');
                 const sw = document.getElementById('sw_' + t.key);
-                const isOn = sw.classList.contains('on');
-                const newState = !isOn;
+                const currentlyOn = sw.classList.contains('on');
+                const newState = !currentlyOn;
 
                 sw.classList.toggle('on', newState);
 

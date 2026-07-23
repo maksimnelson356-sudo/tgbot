@@ -134,6 +134,9 @@ async def get_chat_member(
 async def add_chat_member(
     session: AsyncSession, chat_id: int, user_id: int
 ) -> ChatMember:
+    existing = await get_chat_member(session, chat_id, user_id)
+    if existing:
+        return existing
     member = ChatMember(chat_id=chat_id, user_id=user_id)
     session.add(member)
     await session.commit()

@@ -77,9 +77,10 @@ async def _do_warn(message: Message, reason: str = "No reason provided") -> None
 
         mention = get_user_mention(target)
         await message.answer(t("warn_message", lang, user=mention, count=warn_count, reason=reason))
-        await log_action(session, message.chat.id, target.id, "warned", admin_id=message.from_user.id, details=reason)
+        await log_action(session, chat.id, user.id, "warned", admin_id=admin.id, details=reason)
 
-        if warn_count >= 3:
+        max_warnings = (chat.settings or {}).get("max_warnings", 3)
+        if warn_count >= max_warnings:
             await mute_member(session, chat.id, user.id, 3600)
             await message.answer(t("warn_auto_muted", lang, user=mention))
 
@@ -102,9 +103,10 @@ async def _do_mute(message: Message, args: str = "") -> None:
 
     async with async_session_factory() as session:
         user = await get_or_create_user(session, telegram_id=target.id)
+        admin = await get_or_create_user(session, telegram_id=message.from_user.id)
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         await mute_member(session, chat.id, user.id, duration)
-        await log_action(session, message.chat.id, target.id, "muted", admin_id=message.from_user.id, details=f"{duration}s: {reason}")
+        await log_action(session, chat.id, user.id, "muted", admin_id=admin.id, details=f"{duration}s: {reason}")
 
     try:
         until_date = datetime.datetime.now() + datetime.timedelta(seconds=duration)
@@ -114,10 +116,9 @@ async def _do_mute(message: Message, args: str = "") -> None:
             permissions=ChatPermissions(can_send_messages=False),
             until_date=until_date,
         )
+        await message.answer(t("mute_message", lang, user=get_user_mention(target), duration=_format_duration(duration), reason=reason))
     except Exception as e:
         await message.answer(f"⚠️ Cannot restrict: {e}. Make bot admin!")
-
-    await message.answer(t("mute_message", lang, user=get_user_mention(target), duration=_format_duration(duration), reason=reason))
 
 
 async def _do_ban(message: Message, reason: str = "No reason") -> None:
@@ -142,9 +143,12 @@ async def _do_ban(message: Message, reason: str = "No reason") -> None:
     await message.answer(f"🔨 <b>{mention}</b> забанен. Причина: {reason}")
 
     async with async_session_factory() as session:
+        user = await get_or_create_user(session, telegram_id=target.id)
+        admin = await get_or_create_user(session, telegram_id=message.from_user.id)
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         await log_action(
-            session, message.chat.id, target.id, "banned",
-            admin_id=message.from_user.id, details=reason,
+            session, chat.id, user.id, "banned",
+            admin_id=admin.id, details=reason,
         )
 
 
@@ -200,9 +204,10 @@ async def cmd_unmute(message: Message) -> None:
     target = message.reply_to_message.from_user
     async with async_session_factory() as session:
         user = await get_or_create_user(session, telegram_id=target.id)
+        admin = await get_or_create_user(session, telegram_id=message.from_user.id)
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         await unmute_member(session, chat.id, user.id)
-        await log_action(session, message.chat.id, target.id, "unmuted", admin_id=message.from_user.id)
+        await log_action(session, chat.id, user.id, "unmuted", admin_id=admin.id)
 
     try:
         await message.bot.restrict_chat_member(

@@ -332,10 +332,16 @@ async def cmd_panel(message: Message) -> None:
     """Send WebApp panel button to user's DM."""
     PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"
     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+
+    async with async_session_factory() as session:
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        settings = chat.settings or {}
+
+    params = "&".join(f"{k}={1 if v else 0}" for k, v in settings.items() if isinstance(v, bool))
     kb = InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(
             text=f"⚙️ {message.chat.title or 'Группа'}",
-            web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={message.chat.id}"),
+            web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={message.chat.id}&{params}"),
         )
     ]])
     try:
@@ -364,12 +370,14 @@ async def cmd_panel_dm(message: Message) -> None:
         return
 
     buttons = []
-    for chat in admin_chats:
-        title = chat.title or f"Chat {chat.telegram_id}"
+    for chat_item in admin_chats:
+        title = chat_item.title or f"Chat {chat.telegram_id}"
+        chat_settings = chat_item.settings or {}
+        params = "&".join(f"{k}={1 if v else 0}" for k, v in chat_settings.items() if isinstance(v, bool))
         buttons.append([
             InlineKeyboardButton(
                 text=f"⚙️ {title}",
-                web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={chat.telegram_id}"),
+                web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={chat.telegram_id}&{params}"),
             )
         ])
 

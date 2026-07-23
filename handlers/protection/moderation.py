@@ -57,6 +57,9 @@ def normalize_text(text: str) -> str:
         # Latin → Cyrillic
         if char in _HOMOGLYPH_MAP:
             result.append(_HOMOGLYPH_MAP[char])
+        # Cyrillic → Latin
+        elif char in _REVERSE_HOMOGLYPH:
+            result.append(_REVERSE_HOMOGLYPH[char])
         else:
             result.append(char)
     return "".join(result)
@@ -213,7 +216,7 @@ async def moderate_message(message: Message) -> None:
                 except Exception:
                     pass
                 await log_action(
-                    session, message.chat.id, message.from_user.id,
+                    session, chat.id, user.id,
                     "muted", details=f"Auto-mute: {warn_count}/{max_warnings} warnings",
                 )
                 await message.answer(t("mod_muted", lang, user=mention, count=warn_count, reason=reason))
@@ -222,7 +225,7 @@ async def moderate_message(message: Message) -> None:
                 await message.answer(t("mod_warned", lang, user=mention, count=warn_count, reason=reason))
 
             await log_action(
-                session, message.chat.id, message.from_user.id,
+                session, chat.id, user.id,
                 "warned", details=reason,
             )
 
@@ -277,6 +280,10 @@ async def moderate_nsfw_media(message: Message) -> None:
                         await message.delete()
                     except Exception:
                         pass
+                    await add_warning(session, chat.id, user.id, user.id, reason=f"NSFW domain: {domain}")
+                    warn_count = await increment_warnings(session, chat.id, user.id)
+                    mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
+                    await message.answer(t("mod_warned", lang, user=mention, count=warn_count, reason=f"NSFW link: {domain}"))
                     return
 
         # AI image analysis (Gemini Vision)
@@ -336,10 +343,18 @@ async def moderate_forwarded(message: Message) -> None:
         if not (chat.settings or {}).get("antiforward_enabled", False):
             return
 
+        user = await get_or_create_user(session, telegram_id=message.from_user.id)
+
         try:
             await message.delete()
         except Exception:
             pass
+
+        await add_warning(session, chat.id, user.id, user.id, reason="Forwarded message blocked")
+        warn_count = await increment_warnings(session, chat.id, user.id)
+        mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
+        await message.answer(f"⚠️ {mention}, пересылка сообщений запрещена. Предупреждение {warn_count}/3")
+        await log_action(session, chat.id, user.id, "warned", details="Forwarded message blocked")
 
 
 # NSFW-suggestive emoji often used in inappropriate stickers
@@ -423,8 +438,18 @@ async def moderate_nsfw_sticker(message: Message) -> None:
             if warn_count >= max_warnings:
                 mute_duration = settings.get("mute_duration", 900)
                 await mute_member(session, chat.id, user.id, mute_duration)
+                try:
+                    until_date = datetime.datetime.now() + datetime.timedelta(seconds=mute_duration)
+                    await message.bot.restrict_chat_member(
+                        chat_id=message.chat.id,
+                        user_id=message.from_user.id,
+                        permissions=ChatPermissions(can_send_messages=False),
+                        until_date=until_date,
+                    )
+                except Exception:
+                    pass
                 await log_action(
-                    session, message.chat.id, message.from_user.id,
+                    session, chat.id, user.id,
                     "muted", details=f"Auto-mute: {warn_count}/{max_warnings} NSFW stickers",
                 )
                 await message.answer(
@@ -437,6 +462,6 @@ async def moderate_nsfw_sticker(message: Message) -> None:
                 )
 
             await log_action(
-                session, message.chat.id, message.from_user.id,
+                session, chat.id, user.id,
                 "warned", details=f"NSFW sticker: {sticker_emoji}",
             )
