@@ -104,9 +104,8 @@ async def set_bot_commands(bot: Bot) -> None:
 
     await bot.set_my_commands(private_commands, scope=BotCommandScopeDefault())
     await bot.set_my_commands(user_group_commands, scope=BotCommandScopeAllGroupChats())
-    await bot.set_my_commands(admin_group_commands, scope=BotCommandScopeAllChatAdministrators())
-    logger.info("Bot commands set (private=%d, group_user=%d, group_admin=%d)",
-                len(private_commands), len(user_group_commands), len(admin_group_commands))
+    logger.info("Bot commands set (private=%d, group_user=%d)",
+                len(private_commands), len(user_group_commands))
 
 
 PANEL_URL = "https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html"

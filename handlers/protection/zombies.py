@@ -13,8 +13,6 @@ logger = logging.getLogger(__name__)
 router = Router()
 router.name = "zombies"
 
-BATCH_SIZE = 200
-
 
 @router.message(Command("zombies"), IsGroup(), HasRank(2))
 async def cmd_zombies(message: Message) -> None:
@@ -45,19 +43,16 @@ async def cmd_zombies(message: Message) -> None:
         bots = 0
         errors = 0
         offset = 0
+        seen_ids = set()
 
         while True:
             try:
-                participants = await client.get_participants(
-                    chat, limit=BATCH_SIZE, offset=offset
-                )
+                participants = await client.get_participants(chat, limit=200)
             except Exception as e:
-                logger.warning("Telethon batch error at offset %d: %s", offset, e)
+                logger.warning("Telethon batch error: %s", e)
                 await asyncio.sleep(5)
                 try:
-                    participants = await client.get_participants(
-                        chat, limit=BATCH_SIZE, offset=offset
-                    )
+                    participants = await client.get_participants(chat, limit=200)
                 except Exception:
                     errors += 1
                     break
@@ -65,7 +60,12 @@ async def cmd_zombies(message: Message) -> None:
             if not participants:
                 break
 
+            new_count = 0
             for user in participants:
+                if user.id in seen_ids:
+                    continue
+                seen_ids.add(user.id)
+                new_count += 1
                 count += 1
 
                 if user.bot:
@@ -92,9 +92,11 @@ async def cmd_zombies(message: Message) -> None:
                 if user.photo is None:
                     abandoned += 1
 
-            offset += len(participants)
+            if new_count == 0:
+                break
 
-            # Update status every batch
+            offset += new_count
+
             try:
                 await status_msg.edit_text(
                     f"🔍 Проверено {count} участников...\n"
@@ -103,7 +105,6 @@ async def cmd_zombies(message: Message) -> None:
             except Exception:
                 pass
 
-            # Small delay between batches to avoid flood
             await asyncio.sleep(1)
 
         await asyncio.sleep(3)
