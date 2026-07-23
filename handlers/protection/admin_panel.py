@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from aiogram import Router, F
@@ -76,10 +77,18 @@ async def cmd_admin(message: Message) -> None:
         statuses.append(f"{t(label_key, lang)}: {status}")
 
     builder = _build_admin_kb(lang)
-    await message.answer(
+    panel_msg = await message.answer(
         t("admin_panel_title", lang, statuses="\n".join(statuses)),
         reply_markup=builder.as_markup(),
     )
+
+    async def _delete_later():
+        await asyncio.sleep(120)
+        try:
+            await panel_msg.delete()
+        except Exception:
+            pass
+    asyncio.create_task(_delete_later())
 
 
 @router.callback_query(F.data.startswith("admin:"))
