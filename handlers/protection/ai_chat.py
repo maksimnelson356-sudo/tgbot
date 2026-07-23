@@ -1,6 +1,7 @@
 """AI chat — bot responds to messages using Gemini when ai_chat_enabled."""
 
 import logging
+import time
 
 from aiogram import Router, F
 from aiogram.types import Message
@@ -14,6 +15,10 @@ router.name = "ai_chat"
 
 logger = logging.getLogger(__name__)
 
+# Rate limit: max 1 AI reply per 5 seconds per chat
+_chat_cooldowns: dict[int, float] = {}
+_AI_COOLDOWN: float = 5.0
+
 
 @router.message(IsGroup(), IsReplyToBot(), F.text, ~F.text.startswith("/"))
 async def ai_chat_reply(message: Message) -> None:
@@ -22,6 +27,13 @@ async def ai_chat_reply(message: Message) -> None:
         return
 
     logger.info("AI chat: user=%s chat=%s text='%s'", message.from_user.id, message.chat.id, message.text[:80])
+
+    # Rate limit per chat
+    now = time.time()
+    last = _chat_cooldowns.get(message.chat.id, 0)
+    if now - last < _AI_COOLDOWN:
+        return
+    _chat_cooldowns[message.chat.id] = now
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
