@@ -29,9 +29,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "  /music — Музыка 🎵\n"
             "  /roll — Случайное число 🎲\n\n"
             "📊 <b>Статистика</b>\n"
-            "  /top — Таблица лидеров 🏆\n"
-            "  /stats — Твоя статистика\n\n"
-            "🌐 /language — Switch language / Сменить язык"
+"  /top — Таблица лидеров 🏆\n"
+             "  /stats — Твоя статистика\n\n"
+             "💍 <b>Семья</b>\n"
+             "  /marry (ответом) — Браки 💍\n"
+             "  /unmarry — Развод 💔\n"
+             "  /marriage — Мой брак 💍\n"
+             "  /gift @user — Подарить ⭐\n"
+             "  /familytop — Топ семей 🏆\n\n"
+             "🌐 /language — Switch language / Сменить язык"
         ),
         "help_title": "❓ <b>Помощь</b> — нажми /start",
         "language_prompt": "🌐 <b>Выбери язык / Choose language:</b>",
@@ -158,6 +164,44 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "game_trivia": "🧠 Викторина",
         "game_dice": "🎲 Кубик",
 
+        # Family / Marriage
+        "familytop_empty": "💍 Семейств пока нет! Стань первым с /marry.",
+        "familytop_title": "💍 <b>Топ семей</b>",
+        "marry_no_reply": "Ответь на сообщение пользователя с /marry.",
+        "marry_self": "Нельзя жениться на себе!",
+        "marry_bot": "Нельзя жениться на боте!",
+        "marry_already": "Вы уже в браке.",
+        "marry_pending": "Вы уже отправили заявку.",
+        "marry_has_pending": "У этого пользователя уже есть ожидающая заявка.",
+        "marry_target_married": "Этот пользователь уже женат/замужем.",
+        "marry_error": "Что-то пошло не так.",
+        "marry_propose": "💍 <b>{name}</b> хочет пожениться! Выбери действие:",
+        "marry_accept": "Принять",
+        "marry_reject": "Отклонить",
+        "marry_accepted": "💍 {name} принял(а) вашу заявку! Вы теперь муж и жена!",
+        "marry_accepted_alert": "✅ Заявка принята!",
+        "marry_rejected": "💔 Заявка отклонена.",
+        "marry_rejected_alert": "❌ Заявка отклонена.",
+        "marry_no_proposal": "Нет ожидающих заявок.",
+        "marry_wrong_proposal": "Неверная заявка.",
+        "marry_proposer_accepted": "✅ {name} принял(а) вашу заявку! 💍",
+        "marry_proposer_rejected": "❌ {name} отклонил(а) вашу заявку.",
+        "marry_dm_accept": "Нажми кнопку для ответа:",
+        "marry_divorced": "💔 Вы развелись.",
+        "marry_partner_divorced": "💔 {name} инициировал(а) развод.",
+        "marry_not_married": "Вы не в браке.",
+        "marry_single": "💔 Вы не женаты/замужем.",
+        "marry_status": "Семейное положение",
+        "marry_partner": "Партнёр",
+        "marry_since": "Вместе с",
+        "marry_bonus_cd": "Бонус через",
+        "marry_bonus_ready": "🎁 Ежедневный бонус доступен!",
+        "marry_not_married_gift": "Вы не в браке. Сначала /marry.",
+        "marry_not_partner": "Подарок только партнёру.",
+        "marry_gift_cd": "Подождите {hours}ч {mins}мин до следующего подарка.",
+        "marry_gift_sent": "🎁 Вы подарили репутацию {name}! (всего: {total})",
+        "marry_gift_received": "🎁 {name} подарил(а) вам репутацию!",
+
         # Menu
         "menu_games": "🎮 Игры",
         "menu_joke": "😂 Шутка",
@@ -193,9 +237,15 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
             "  /music — Search music 🎵\n"
             "  /roll — Random number 🎲\n\n"
             "📊 <b>Stats</b>\n"
-            "  /top — Leaderboard 🏆\n"
-            "  /stats — Your stats\n\n"
-            "🌐 /language — Switch language / Сменить язык"
+"  /top — Leaderboard 🏆\n"
+             "  /stats — Your stats\n\n"
+             "💍 <b>Family</b>\n"
+             "  /marry (reply) — Propose 💍\n"
+             "  /unmarry — Divorce 💔\n"
+             "  /marriage — Your status 💍\n"
+             "  /gift @user — Gift ⭐\n"
+             "  /familytop — Top families 🏆\n\n"
+             "🌐 /language — Switch language / Сменить язык"
         ),
         "help_title": "❓ <b>Help</b> — press /start",
         "language_prompt": "🌐 <b>Choose language / Выбери язык:</b>",
@@ -321,6 +371,46 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "game_guess": "🔢 Guess the Number",
         "game_trivia": "🧠 Trivia",
         "game_dice": "🎲 Dice",
+
+        # Family / Marriage
+        "familytop_empty": "💍 No families yet! Be the first with /marry.",
+        "familytop_title": "💍 <b>Top Families</b>",
+        "marry_no_reply": "Reply to a user with /marry.",
+        "marry_self": "You can't marry yourself!",
+        "marry_bot": "You can't marry a bot!",
+        "marry_already": "You are already married.",
+        "marry_pending": "You already sent a proposal.",
+        "marry_has_pending": "This user already has a pending proposal.",
+        "marry_target_married": "This user is already married.",
+        "marry_error": "Something went wrong.",
+        "marry_propose_en": "💍 <b>{name}</b> wants to marry! Choose:",
+        "marry_propose": "💍 <b>{name}</b> хочет пожениться! Выбери действие:",
+        "marry_accept": "Принять",
+        "marry_reject": "Отклонить",
+        "marry_accepted": "💍 {name} accepted your proposal! You are now married!",
+        "marry_accepted_alert": "✅ Proposal accepted!",
+        "marry_rejected": "💔 Proposal rejected.",
+        "marry_rejected_alert": "❌ Proposal rejected.",
+        "marry_no_proposal": "No pending proposals for you.",
+        "marry_wrong_proposal": "Wrong proposal.",
+        "marry_proposer_accepted": "✅ {name} accepted your proposal! 💍",
+        "marry_proposer_rejected": "❌ {name} rejected your proposal.",
+        "marry_dm_accept_en": "Tap the button to respond:",
+        "marry_dm_accept": "Нажми кнопку для ответа:",
+        "marry_divorced": "💔 You are now divorced.",
+        "marry_partner_divorced": "💔 {name} initiated a divorce.",
+        "marry_not_married": "You are not married.",
+        "marry_single": "💔 You are single.",
+        "marry_status": "Relationship status",
+        "marry_partner": "Partner",
+        "marry_since": "Together since",
+        "marry_bonus_cd": "Bonus in",
+        "marry_bonus_ready": "🎁 Daily bonus available!",
+        "marry_not_married_gift": "You are not married. Use /marry first.",
+        "marry_not_partner": "Gift only for your partner.",
+        "marry_gift_cd": "Wait {hours}h {mins}m before gifting again.",
+        "marry_gift_sent": "🎁 Gifted reputation to {name}! (total: {total})",
+        "marry_gift_received": "🎁 {name} gifted you reputation!",
 
         # Menu
         "menu_games": "🎮 Games",

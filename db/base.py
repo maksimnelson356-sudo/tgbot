@@ -29,10 +29,12 @@ async def init_db() -> None:
         ChatAdmin,
         ChatMember,
         GameStats,
+        Marriage,
         MessageLog,
         Note,
         Reputation,
         ScheduledPost,
+        User,
         User,
         Warning,
     )

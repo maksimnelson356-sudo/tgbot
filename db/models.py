@@ -190,3 +190,20 @@ class ScheduledPost(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.now
     )
+
+
+class Marriage(Base):
+    """Marriage/relationship records between users."""
+    __tablename__ = "marriages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user1_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    user2_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="married")  # married, divorced, pending
+    proposer_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    acceptor_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    married_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    divorced_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now
+    )

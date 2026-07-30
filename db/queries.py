@@ -613,3 +613,149 @@ async def delete_scheduled_post(session: AsyncSession, post_id: int) -> bool:
     post.is_active = False
     await session.commit()
     return True
+
+
+# ── Marriages ──────────────────────────────────────────────────────────
+
+async def get_marriage(
+    session: AsyncSession, user1_id: int, user2_id: int
+) -> Optional[dict]:
+    """Check if two users are married. Returns marriage record or None."""
+    from db.models import Marriage
+    stmt1 = select(Marriage).where(
+        Marriage.user1_id == user1_id,
+        Marriage.user2_id == user2_id,
+        Marriage.status == "married",
+    )
+    stmt2 = select(Marriage).where(
+        Marriage.user1_id == user2_id,
+        Marriage.user2_id == user1_id,
+        Marriage.status == "married",
+    )
+    for stmt in (stmt1, stmt2):
+        result = await session.execute(stmt)
+        marriage = result.scalar_one_or_none()
+        if marriage:
+            other_id = marriage.user2_id if marriage.user1_id == user1_id else marriage.user1_id
+            return {
+                "id": marriage.id,
+                "partner_id": other_id,
+                "status": marriage.status,
+                "married_at": marriage.married_at,
+                "proposer_id": marriage.proposer_id,
+            }
+    return None
+
+
+async def get_pending_proposal(
+    session: AsyncSession, user_id: int
+) -> Optional[dict]:
+    """Check if user has a pending marriage proposal."""
+    from db.models import Marriage
+    stmt = select(Marriage).where(
+        Marriage.user2_id == user_id,
+        Marriage.status == "pending",
+    )
+    result = await session.execute(stmt)
+    proposal = result.scalar_one_or_none()
+    if proposal:
+        return {
+            "id": proposal.id,
+            "proposer_id": proposal.proposer_id,
+            "created_at": proposal.created_at,
+        }
+    return None
+
+
+async def get_user_marriages(
+    session: AsyncSession, user_id: int
+) -> list[dict]:
+    """Get all marriages (including divorced) for a user."""
+    from db.models import Marriage
+    stmt = select(Marriage).where(
+        (Marriage.user1_id == user_id) | (Marriage.user2_id == user_id),
+    )
+    result = await session.execute(stmt)
+    marriages = list(result.scalars().all())
+    out = []
+    for m in marriages:
+        other_id = m.user2_id if m.user1_id == user_id else m.user1_id
+        out.append(
+            {
+                "id": m.id,
+                "partner_id": other_id,
+                "status": m.status,
+                "married_at": m.married_at,
+                "divorced_at": m.divorced_at,
+                "proposer_id": m.proposer_id,
+            }
+        )
+    return out
+
+
+async def propose_marriage(
+    session: AsyncSession, proposer_id: int, target_id: int
+) -> Marriage:
+    """Create a pending marriage proposal."""
+    from db.models import Marriage
+    existing = await get_marriage(session, proposer_id, target_id)
+    if existing and existing["status"] == "married":
+        raise ValueError("already_married")
+
+    marriage = Marriage(
+        user1_id=proposer_id,
+        user2_id=target_id,
+        status="pending",
+        proposer_id=proposer_id,
+    )
+    session.add(marriage)
+    await session.commit()
+    await session.refresh(marriage)
+    return marriage
+
+
+async def accept_marriage(
+    session: AsyncSession, marriage_id: int, acceptor_id: int
+) -> Marriage:
+    """Accept a pending marriage proposal."""
+    from db.models import Marriage
+    marriage = await session.get(Marriage, marriage_id)
+    if marriage is None:
+        raise ValueError("proposal_not_found")
+    if marriage.status != "pending":
+        raise ValueError("not_pending")
+    if marriage.user2_id != acceptor_id:
+        raise ValueError("not_target")
+
+    marriage.status = "married"
+    marriage.acceptor_id = acceptor_id
+    marriage.married_at = datetime.datetime.now()
+    await session.commit()
+    await session.refresh(marriage)
+    return marriage
+
+
+async def divorce_marriage(
+    session: AsyncSession, user1_id: int, user2_id: int
+) -> bool:
+    """Divorce two users."""
+    from db.models import Marriage
+    stmt1 = select(Marriage).where(
+        Marriage.user1_id == user1_id,
+        Marriage.user2_id == user2_id,
+        Marriage.status == "married",
+    )
+    stmt2 = select(Marriage).where(
+        Marriage.user1_id == user2_id,
+        Marriage.user2_id == user1_id,
+        Marriage.status == "married",
+    )
+    for stmt in (stmt1, stmt2):
+        result = await session.execute(stmt)
+        marriage = result.scalar_one_or_none()
+        if marriage:
+            marriage.status = "divorced"
+            marriage.divorced_at = datetime.datetime.now()
+            await session.commit()
+            return True
+    return False
