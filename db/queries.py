@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import ActionLog, BannedSticker, Chat, ChatMember, GameStats, MessageLog, Note, Reputation, User, Warning
+from db.models import ActionLog, BannedSticker, Chat, ChatMember, GameStats, Marriage, MessageLog, Note, Reputation, User, Warning
 
 
 # ── User ──────────────────────────────────────────────────────────────────────
