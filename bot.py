@@ -56,10 +56,15 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="info", description="User info 👤"),
         BotCommand(command="report", description="Report message 🚨"),
         BotCommand(command="calladmin", description="Call admins 🚨"),
-        BotCommand(command="rate", description="Give reputation ⭐"),
-        BotCommand(command="rep", description="Check reputation ⭐"),
-        BotCommand(command="toprep", description="Reputation top 🏆"),
-        BotCommand(command="rules", description="Chat rules 📜"),
+        BotCommand(command="gift", description="Подарить партнёру 🎁"),
+        BotCommand(command="familytop", description="Топ семей 💍"),
+        BotCommand(command="marry", description="Браки 💍"),
+        BotCommand(command="unmarry", description="Развод 💔"),
+        BotCommand(command="marriage", description="Мой брак 💍"),
+        BotCommand(command="rate", description="Поставить репутацию ⭐"),
+        BotCommand(command="rep", description="Моя репутация ⭐"),
+        BotCommand(command="toprep", description="Топ репутации 🏆"),
+        BotCommand(command="rules", description="Чат правила 📜"),
         BotCommand(command="joke", description="Random joke 😂"),
         BotCommand(command="fact", description="Random fact 🧠"),
         BotCommand(command="weather", description="Weather 🌤"),
@@ -161,6 +166,33 @@ async def main() -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
+    # ── Auto-delete bot messages in groups (15s) ─────────────────────────
+    from aiogram.types import Message as _Msg
+    from utils.helpers import delete_after as _delete_after
+
+    _orig_answer = _Msg.answer
+    _orig_reply = _Msg.reply
+    _MEDIA_ATTRS = ("audio", "video", "photo", "animation", "document",
+                    "voice", "video_note", "sticker")
+
+    async def _auto_del_answer(self, *a, **kw):
+        result = await _orig_answer(self, *a, **kw)
+        if (result and self.chat.type in ("group", "supergroup")
+                and not any(getattr(result, attr, None) for attr in _MEDIA_ATTRS)):
+            asyncio.create_task(_delete_after(result, 15.0))
+        return result
+
+    async def _auto_del_reply(self, *a, **kw):
+        result = await _orig_reply(self, *a, **kw)
+        if (result and self.chat.type in ("group", "supergroup")
+                and not any(getattr(result, attr, None) for attr in _MEDIA_ATTRS)):
+            asyncio.create_task(_delete_after(result, 15.0))
+        return result
+
+    _Msg.answer = _auto_del_answer
+    _Msg.reply = _auto_del_reply
+    logger.info("Auto-delete patched: bot messages in groups will expire in 15s")
+
     bot = Bot(
         token=settings.BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -203,6 +235,7 @@ async def main() -> None:
     from handlers.protection.scheduler import router as scheduler_router
     from handlers.protection.webapp import router as webapp_router
     from handlers.protection.ai_chat import router as ai_chat_router
+    from handlers.relationships import router as relationships_router
 
     # ── Register middlewares ──────────────────────────────────────────────
     from middlewares.throttling import ThrottlingMiddleware
@@ -216,7 +249,7 @@ async def main() -> None:
     dp.message.middleware(SlowModeMiddleware())
     dp.chat_join_request.middleware(LoggingMiddleware())
 
-    # ── Register routers ─────────────────────────────────────────────────
+    # ── Register routers ─────────────────────────────────────────
     # ORDER MATTERS:
     # - music_router, ai_chat_router, captcha_router: handle specific text (FSM, replies, pending captcha)
     # - autoresponder_router: catches text for auto-replies
@@ -249,6 +282,7 @@ async def main() -> None:
     dp.include_router(utilities_router)
     dp.include_router(scheduler_router)
     dp.include_router(webapp_router)
+    dp.include_router(relationships_router)
     dp.include_router(antispam_router)
     dp.include_router(moderation_router)
 

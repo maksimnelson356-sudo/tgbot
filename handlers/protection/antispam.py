@@ -84,7 +84,7 @@ async def on_chat_member_update(event: ChatMemberUpdated) -> None:
         try:
             await asyncio.sleep(20)
             sent = await event.bot.send_message(chat_id, f"👋 {name}, {welcome_msg}")
-            asyncio.create_task(_delete_after(sent, 3.0))
+            asyncio.create_task(_delete_after(sent, 45.0))
         except Exception:
             pass
 
