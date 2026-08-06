@@ -3,6 +3,7 @@ sqlalchemy[asyncio]>=2.0
 aiosqlite>=0.20
 pydantic-settings>=2.0
 Pillow>=10.0
+beautifulsoup4>=4.12
 aiohttp>=3.9
 yt-dlp>=2024.1
 telethon>=1.36
