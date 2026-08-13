@@ -8,13 +8,13 @@ from db.queries import (
     list_banned_stickers, unban_sticker,
 )
 from filters.admin import HasRank
-from filters.chat_type import IsGroup
+from filters.chat_type import IsGroup, IsReplyTo
 
 router = Router()
 router.name = "bansticker"
 
 
-@router.message(Command("bansticker"), IsGroup(), HasRank(2), F.reply_to_message)
+@router.message(Command("bansticker"), IsGroup(), HasRank(2), IsReplyTo())
 async def cmd_bansticker(message: Message) -> None:
     """Ban a sticker. Usage: reply to sticker with /bansticker"""
     sticker = message.reply_to_message.sticker

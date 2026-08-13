@@ -178,6 +178,7 @@ async def main() -> None:
     async def _auto_del_answer(self, *a, **kw):
         result = await _orig_answer(self, *a, **kw)
         if (result and self.chat.type in ("group", "supergroup")
+                and not result.reply_markup
                 and not any(getattr(result, attr, None) for attr in _MEDIA_ATTRS)):
             asyncio.create_task(_delete_after(result, 15.0))
         return result
@@ -185,6 +186,7 @@ async def main() -> None:
     async def _auto_del_reply(self, *a, **kw):
         result = await _orig_reply(self, *a, **kw)
         if (result and self.chat.type in ("group", "supergroup")
+                and not result.reply_markup
                 and not any(getattr(result, attr, None) for attr in _MEDIA_ATTRS)):
             asyncio.create_task(_delete_after(result, 15.0))
         return result

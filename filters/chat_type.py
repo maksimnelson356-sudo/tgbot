@@ -26,6 +26,16 @@ class IsReplyToBot(Filter):
         return message.reply_to_message.from_user.id == message.bot.id
 
 
+class IsReplyTo(Filter):
+    """Filter: message is a reply to any user message (works in aiogram 3.30)."""
+
+    async def __call__(self, message: Message) -> bool:
+        return (
+            message.reply_to_message is not None
+            and message.reply_to_message.from_user is not None
+        )
+
+
 class HasPendingCaptcha(Filter):
     """Filter: user has a pending CAPTCHA in this chat."""
 

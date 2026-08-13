@@ -14,6 +14,7 @@ from db.queries import (
     get_user_marriages,
     propose_marriage,
 )
+from filters.chat_type import IsReplyTo
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -27,7 +28,7 @@ _DAILY_BONUS_COOLDOWN: float = 86400  # 24 hours
 _DAILY_REP_BONUS_REPUTE: int = 1
 
 
-@router.message(Command("marry"), F.reply_to_message)
+@router.message(Command("marry"), IsReplyTo())
 async def cmd_marry(message: Message) -> None:
     """Send marriage proposal. Usage: reply to user with /marry"""
     lang = await get_user_lang(message)
@@ -158,7 +159,10 @@ async def on_marry_accept(callback: CallbackQuery) -> None:
     partner_name_a = callback.from_user.first_name or f"User {callback.from_user.id}"
     proposer_text = t("marry_accepted", lang, name=partner_name_a)
 
-    await callback.message.edit_text(proposer_text)
+    try:
+        await callback.message.edit_text(proposer_text)
+    except Exception:
+        pass
     await callback.answer(t("marry_accepted_alert", lang), show_alert=True)
 
     # Notify proposer
@@ -206,7 +210,10 @@ async def on_marry_reject(callback: CallbackQuery) -> None:
             await session.delete(m)
             await session.commit()
 
-    await callback.message.edit_text(t("marry_rejected", lang))
+    try:
+        await callback.message.edit_text(t("marry_rejected", lang))
+    except Exception:
+        pass
     await callback.answer(t("marry_rejected_alert", lang), show_alert=True)
 
     # Notify proposer

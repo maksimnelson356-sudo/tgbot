@@ -11,7 +11,7 @@ from db.queries import add_chat_admin, get_or_create_chat, get_chat_admin_rank
 from db.queries import list_chat_admins, remove_chat_admin, update_chat_settings
 from db.queries import get_or_create_user, is_chat_admin_db
 from filters.admin import HasRank
-from filters.chat_type import IsGroup
+from filters.chat_type import IsGroup, IsReplyTo
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -266,7 +266,7 @@ async def cmd_adminlist(message: Message) -> None:
 
 # ── "Повысить" / "Понизить" / "Кто админ" — text commands ────────────────────
 
-@router.message(F.text.in_({"Повысить", "повысить", "ПОВЫСИТЬ"}), F.reply_to_message, IsGroup(), HasRank(3))
+@router.message(F.text.in_({"Повысить", "повысить", "ПОВЫСИТЬ"}), IsReplyTo(), IsGroup(), HasRank(3))
 async def text_addadmin(message: Message) -> None:
     """Reply with 'Повысить' to promote a user by one rank (max 3)."""
     target = message.reply_to_message.from_user
@@ -287,7 +287,7 @@ async def text_addadmin(message: Message) -> None:
     await message.answer(f"✅ <b>{name}</b> назначен — {rank_label}")
 
 
-@router.message(F.text.in_({"Понизить", "понизить", "ПОНИЗИТЬ"}), F.reply_to_message, IsGroup(), HasRank(3))
+@router.message(F.text.in_({"Понизить", "понизить", "ПОНИЗИТЬ"}), IsReplyTo(), IsGroup(), HasRank(3))
 async def text_removeadmin(message: Message) -> None:
     """Reply with 'Понизить' to demote a user."""
     target = message.reply_to_message.from_user

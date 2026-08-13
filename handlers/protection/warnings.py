@@ -20,7 +20,7 @@ from db.queries import (
     unmute_member,
 )
 from filters.admin import HasRank
-from filters.chat_type import IsGroup
+from filters.chat_type import IsGroup, IsReplyTo
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 from utils.helpers import get_user_mention
@@ -270,19 +270,19 @@ async def cmd_list_warnings(message: Message) -> None:
 
 # ── Text aliases: "Пред", "Мут", "Бан" (reply to message) ────────────────────
 
-@router.message(F.text.in_({"Пред", "пред", "ПРЕД"}), F.reply_to_message, IsGroup(), HasRank(1))
+@router.message(F.text.in_({"Пред", "пред", "ПРЕД"}), IsReplyTo(), IsGroup(), HasRank(1))
 async def text_warn(message: Message) -> None:
     """Reply with 'Пред' to warn a user."""
     await _do_warn(message, "Текстовая команда")
 
 
-@router.message(F.text.in_({"Мут", "мут", "МУТ"}), F.reply_to_message, IsGroup(), HasRank(1))
+@router.message(F.text.in_({"Мут", "мут", "МУТ"}), IsReplyTo(), IsGroup(), HasRank(1))
 async def text_mute(message: Message) -> None:
     """Reply with 'Мут' to mute a user."""
     await _do_mute(message)
 
 
-@router.message(F.text.in_({"Бан", "бан", "БАН"}), F.reply_to_message, IsGroup(), HasRank(2))
+@router.message(F.text.in_({"Бан", "бан", "БАН"}), IsReplyTo(), IsGroup(), HasRank(2))
 async def text_ban(message: Message) -> None:
     """Reply with 'Бан' to ban a user."""
     await _do_ban(message, "Текстовая команда")
