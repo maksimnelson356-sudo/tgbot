@@ -148,6 +148,11 @@ async def on_startup(bot: Bot) -> None:
     from services.telethon_client import get_client
     await get_client()
 
+    # Start auto-unmute background task
+    from handlers.protection.utilities import auto_unmute_check
+    asyncio.create_task(auto_unmute_check(bot))
+    logger.info("Auto-unmute task started")
+
     # Set WebApp menu button for all chats
     await set_menu_buttons(bot)
 

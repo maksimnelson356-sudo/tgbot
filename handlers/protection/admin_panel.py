@@ -380,7 +380,7 @@ async def cmd_panel_dm(message: Message) -> None:
 
     buttons = []
     for chat_item in admin_chats:
-        title = chat_item.title or f"Chat {chat.telegram_id}"
+        title = chat_item.title or f"Chat {chat_item.telegram_id}"
         chat_settings = chat_item.settings or {}
         params = "&".join(f"{k}={1 if v else 0}" for k, v in chat_settings.items() if isinstance(v, bool))
         buttons.append([

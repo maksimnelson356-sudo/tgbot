@@ -12,7 +12,11 @@ _db_dir = os.path.dirname(_db_path)
 if _db_dir:
     os.makedirs(_db_dir, exist_ok=True)
 
-engine = create_async_engine(settings.DATABASE_URL, echo=False)
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=False,
+    connect_args={"timeout": 30},
+)
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -40,6 +44,11 @@ async def init_db() -> None:
     )
 
     async with engine.begin() as conn:
+        # Enable WAL mode for better concurrent read/write
+        if settings.DATABASE_URL.startswith("sqlite"):
+            await conn.execute(
+                __import__("sqlalchemy").text("PRAGMA journal_mode=WAL")
+            )
         await conn.run_sync(Base.metadata.create_all)
 
 

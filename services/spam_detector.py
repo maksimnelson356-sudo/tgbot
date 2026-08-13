@@ -85,6 +85,10 @@ class SpamDetector:
                 score += 0.7
                 reasons.append("Message repetition")
 
+            # Prune user key if list is empty
+            if not user_msgs:
+                self.recent_messages.pop(user_id, None)
+
         is_spam = score >= 0.5
         return SpamResult(
             is_spam=is_spam,

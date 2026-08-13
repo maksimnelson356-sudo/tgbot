@@ -183,7 +183,7 @@ async def moderate_message(message: Message) -> None:
             if bot_settings.GOOGLE_API_KEY:
                 try:
                     from services.ai_moderation import check_text
-                    ai_result = await check_text(text)
+                    ai_result = await check_text(text, chat_id=message.chat.id)
                     if ai_result and not ai_result.get("allowed", True):
                         reason = f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
                 except Exception:
@@ -291,7 +291,7 @@ async def moderate_nsfw_media(message: Message) -> None:
         if bot_settings.GOOGLE_API_KEY and message.photo:
             try:
                 from services.ai_moderation import check_photo_from_telegram
-                ai_result = await check_photo_from_telegram(message.bot, message.photo[-1].file_id)
+                ai_result = await check_photo_from_telegram(message.bot, message.photo[-1].file_id, chat_id=message.chat.id)
                 if ai_result and not ai_result.get("allowed", True):
                     reason = f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
                     try:

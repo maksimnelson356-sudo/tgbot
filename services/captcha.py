@@ -129,4 +129,22 @@ def remove_challenge(chat_id: int, user_id: int) -> None:
 
 
 def has_pending(chat_id: int, user_id: int) -> bool:
-    return (chat_id, user_id) in _pending
+    pending = _pending.get((chat_id, user_id))
+    if pending is None:
+        return False
+    if time.time() - pending["sent_at"] > settings.CAPTCHA_TIMEOUT:
+        del _pending[(chat_id, user_id)]
+        return False
+    return True
+
+
+def sweep_expired() -> int:
+    """Remove all expired pending captchas. Returns count removed."""
+    now = time.time()
+    expired = [
+        key for key, val in _pending.items()
+        if now - val["sent_at"] > settings.CAPTCHA_TIMEOUT
+    ]
+    for key in expired:
+        del _pending[key]
+    return len(expired)

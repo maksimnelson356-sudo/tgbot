@@ -363,12 +363,13 @@ async def cmd_gift(message: Message) -> None:
     _daily_bonus_cooldown[cooldown_key] = now
 
     # Award reputation to partner
-    from db.queries import give_reputation
+    from db.queries import give_reputation, get_or_create_chat
     async with async_session_factory() as session:
         partner = await get_or_create_user(session, telegram_id=target_id)
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id) if message.chat else None
         total = await give_reputation(
             session,
-            message.chat.id if message.chat else 0,
+            chat.id if chat else 0,
             partner.id,
             message.from_user.id,
         )

@@ -72,7 +72,6 @@ async def _scheduler_loop(bot) -> None:
                         logger.info("Scheduled post %s sent to chat %s", post.id, post.chat_telegram_id)
                     except Exception as e:
                         logger.warning("Failed to send scheduled post %s: %s", post.id, e)
-                        await update_post_last_sent(session, post.id)
         except Exception as e:
             logger.warning("Scheduler loop error: %s", e)
 

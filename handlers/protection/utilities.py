@@ -5,7 +5,7 @@ import datetime
 
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, ChatPermissions
 
 from db.base import async_session_factory
 from db.queries import add_note, get_or_create_chat, update_chat_settings
@@ -164,14 +164,13 @@ async def cmd_allowlink(message: Message) -> None:
 
 async def auto_unmute_check(bot):
     """Background task: check and unmute expired mutes."""
-    from db.models import Chat, ChatMember
+    from db.models import Chat, ChatMember, User
     from sqlalchemy import select
 
     while True:
         await asyncio.sleep(300)  # 5 min
         try:
             async with async_session_factory() as session:
-                from sqlalchemy import select
                 now = datetime.datetime.now()
                 stmt = select(ChatMember).join(Chat).where(
                     ChatMember.is_muted == True,
@@ -184,10 +183,15 @@ async def auto_unmute_check(bot):
                 for m in expired:
                     m.is_muted = False
                     m.muted_until = None
-                    # Try Telegram API unmute
+                    # Lift Telegram restriction
                     try:
-                        # We need bot here - will be passed via startup
-                        pass
+                        chat_obj = await session.get(Chat, m.chat_id)
+                        if chat_obj:
+                            await bot.restrict_chat_member(
+                                chat_id=chat_obj.telegram_id,
+                                user_id=(await session.get(User, m.user_id)).telegram_id,
+                                permissions=ChatPermissions(can_send_messages=True),
+                            )
                     except Exception:
                         pass
                 await session.commit()

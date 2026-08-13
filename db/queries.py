@@ -2,6 +2,7 @@ import datetime
 from typing import Optional
 
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ActionLog, BannedSticker, Chat, ChatMember, GameStats, Marriage, MessageLog, Note, Reputation, User, Warning
@@ -20,8 +21,14 @@ async def get_or_create_user(
     if user is None:
         user = User(telegram_id=telegram_id, **kwargs)
         session.add(user)
-        await session.commit()
-        await session.refresh(user)
+        try:
+            await session.commit()
+            await session.refresh(user)
+        except IntegrityError:
+            await session.rollback()
+            stmt = select(User).where(User.telegram_id == telegram_id)
+            result = await session.execute(stmt)
+            user = result.scalar_one()
     else:
         # Update fields if provided
         changed = False
@@ -71,8 +78,14 @@ async def get_or_create_chat(
             settings=default_settings,
         )
         session.add(chat)
-        await session.commit()
-        await session.refresh(chat)
+        try:
+            await session.commit()
+            await session.refresh(chat)
+        except IntegrityError:
+            await session.rollback()
+            stmt = select(Chat).where(Chat.telegram_id == telegram_id)
+            result = await session.execute(stmt)
+            chat = result.scalar_one()
     else:
         changed = False
         if title and chat.title != title:
@@ -271,12 +284,13 @@ async def get_reputation(
 async def get_top_reputation(
     session: AsyncSession, chat_id: int, limit: int = 10
 ) -> list[tuple[int, int]]:
-    """Get top users by reputation. Returns list of (user_id, count)."""
+    """Get top users by reputation. Returns list of (telegram_id, count)."""
     from sqlalchemy import select, func
     stmt = (
-        select(Reputation.user_id, func.count(Reputation.id).label("rep"))
+        select(User.telegram_id, func.count(Reputation.id).label("rep"))
+        .join(User, User.id == Reputation.user_id)
         .where(Reputation.chat_id == chat_id)
-        .group_by(Reputation.user_id)
+        .group_by(User.telegram_id)
         .order_by(func.count(Reputation.id).desc())
         .limit(limit)
     )
@@ -293,6 +307,7 @@ async def update_game_stats(
     outcome: str,  # 'win', 'loss', 'draw'
     chat_id: Optional[int] = None,
 ) -> GameStats:
+    # Ensure row exists
     stmt = select(GameStats).where(
         GameStats.user_id == user_id,
         GameStats.game_type == game_type,
@@ -310,19 +325,21 @@ async def update_game_stats(
             draws=0,
         )
         session.add(stats)
+        try:
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            result = await session.execute(stmt)
+            stats = result.scalar_one()
 
-    # Ensure values are not None (for old records)
-    stats.wins = stats.wins if stats.wins is not None else 0
-    stats.losses = stats.losses if stats.losses is not None else 0
-    stats.draws = stats.draws if stats.draws is not None else 0
-
-    if outcome == "win":
-        stats.wins += 1
-    elif outcome == "loss":
-        stats.losses += 1
-    elif outcome == "draw":
-        stats.draws += 1
-
+    # Atomic increment
+    from sqlalchemy import update
+    col = GameStats.wins if outcome == "win" else GameStats.losses if outcome == "loss" else GameStats.draws
+    await session.execute(
+        update(GameStats)
+        .where(GameStats.user_id == user_id, GameStats.game_type == game_type)
+        .values(**{col.key: col + 1})
+    )
     await session.commit()
     await session.refresh(stats)
     return stats
@@ -405,9 +422,18 @@ async def ban_sticker(
 ) -> BannedSticker:
     bs = BannedSticker(chat_id=chat_id, file_unique_id=file_unique_id, emoji=emoji, added_by=added_by)
     session.add(bs)
-    await session.commit()
-    await session.refresh(bs)
-    return bs
+    try:
+        await session.commit()
+        await session.refresh(bs)
+        return bs
+    except IntegrityError:
+        await session.rollback()
+        stmt = select(BannedSticker).where(
+            BannedSticker.chat_id == chat_id,
+            BannedSticker.file_unique_id == file_unique_id,
+        )
+        result = await session.execute(stmt)
+        return result.scalars().first()
 
 
 async def is_sticker_banned(session: AsyncSession, chat_id: int, file_unique_id: str) -> bool:
@@ -416,7 +442,7 @@ async def is_sticker_banned(session: AsyncSession, chat_id: int, file_unique_id:
         BannedSticker.file_unique_id == file_unique_id,
     )
     result = await session.execute(stmt)
-    return result.scalar_one_or_none() is not None
+    return result.scalars().first() is not None
 
 
 async def unban_sticker(session: AsyncSession, chat_id: int, file_unique_id: str) -> bool:

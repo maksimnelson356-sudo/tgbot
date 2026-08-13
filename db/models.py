@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy import JSON
@@ -66,8 +66,8 @@ class Warning(Base):
     __tablename__ = "warnings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"))
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
     admin_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
@@ -82,8 +82,8 @@ class MessageLog(Base):
     __tablename__ = "message_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"))
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     message_id: Mapped[int] = mapped_column(Integer, nullable=True)
     text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -96,8 +96,8 @@ class ActionLog(Base):
     __tablename__ = "action_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"))
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     admin_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     action_type: Mapped[str] = mapped_column(String(32))
     details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -112,9 +112,9 @@ class GameStats(Base):
     __tablename__ = "game_stats"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
     chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"), nullable=True)
-    game_type: Mapped[str] = mapped_column(String(32))
+    game_type: Mapped[str] = mapped_column(String(32), index=True)
     wins: Mapped[int] = mapped_column(Integer, default=0)
     losses: Mapped[int] = mapped_column(Integer, default=0)
     draws: Mapped[int] = mapped_column(Integer, default=0)
@@ -124,6 +124,7 @@ class GameStats(Base):
 
 class BannedSticker(Base):
     __tablename__ = "banned_stickers"
+    __table_args__ = (UniqueConstraint("chat_id", "file_unique_id", name="uq_banned_sticker"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"))
@@ -139,8 +140,8 @@ class Reputation(Base):
     __tablename__ = "reputation"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"))
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
     given_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.now
@@ -165,8 +166,8 @@ class ChatAdmin(Base):
     __tablename__ = "chat_admins"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"))
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    chat_id: Mapped[int] = mapped_column(Integer, ForeignKey("chats.id"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
     rank: Mapped[int] = mapped_column(Integer, default=3)  # 1=junior, 2=admin, 3=head
     added_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
     created_at: Mapped[datetime.datetime] = mapped_column(
