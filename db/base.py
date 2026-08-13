@@ -36,6 +36,7 @@ async def init_db() -> None:
         Marriage,
         MessageLog,
         Note,
+        Reminder,
         Reputation,
         ScheduledPost,
         User,

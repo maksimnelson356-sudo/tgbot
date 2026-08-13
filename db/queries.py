@@ -785,3 +785,35 @@ async def divorce_marriage(
             await session.commit()
             return True
     return False
+
+
+# ── Reminders ────────────────────────────────────────────────────────────────
+
+async def create_reminder(
+    session: AsyncSession, user_id: int, chat_id: int, text: str, remind_at: datetime.datetime
+) -> "Reminder":
+    from db.models import Reminder
+    r = Reminder(user_id=user_id, chat_id=chat_id, text=text, remind_at=remind_at)
+    session.add(r)
+    await session.commit()
+    await session.refresh(r)
+    return r
+
+
+async def get_due_reminders(session: AsyncSession) -> list:
+    from db.models import Reminder
+    now = datetime.datetime.now()
+    stmt = select(Reminder).where(
+        Reminder.is_sent == False,
+        Reminder.remind_at <= now,
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def mark_reminder_sent(session: AsyncSession, reminder_id: int) -> None:
+    from db.models import Reminder
+    r = await session.get(Reminder, reminder_id)
+    if r:
+        r.is_sent = True
+        await session.commit()

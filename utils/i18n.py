@@ -202,6 +202,16 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "marry_gift_sent": "🎁 Вы подарили репутацию {name}! (всего: {total})",
         "marry_gift_received": "🎁 {name} подарил(а) вам репутацию!",
 
+        # Profile
+        "profile_title": "Профиль",
+        "profile_name": "Имя",
+        "profile_username": "Username",
+        "profile_id": "ID",
+        "profile_language": "Язык",
+        "profile_reputation": "Репутация",
+        "profile_warnings": "Предупреждения",
+        "profile_since": "С нами с",
+
         # Menu
         "menu_games": "🎮 Игры",
         "menu_joke": "😂 Шутка",
@@ -411,6 +421,16 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "marry_gift_cd": "Wait {hours}h {mins}m before gifting again.",
         "marry_gift_sent": "🎁 Gifted reputation to {name}! (total: {total})",
         "marry_gift_received": "🎁 {name} gifted you reputation!",
+
+        # Profile
+        "profile_title": "Profile",
+        "profile_name": "Name",
+        "profile_username": "Username",
+        "profile_id": "ID",
+        "profile_language": "Language",
+        "profile_reputation": "Reputation",
+        "profile_warnings": "Warnings",
+        "profile_since": "Member since",
 
         # Menu
         "menu_games": "🎮 Games",

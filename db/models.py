@@ -190,6 +190,21 @@ class ScheduledPost(Base):
     )
 
 
+class Reminder(Base):
+    """One-time reminders."""
+    __tablename__ = "reminders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    text: Mapped[str] = mapped_column(Text)
+    remind_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, index=True)
+    is_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now
+    )
+
+
 class Marriage(Base):
     """Marriage/relationship records between users."""
     __tablename__ = "marriages"

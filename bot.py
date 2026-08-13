@@ -65,6 +65,9 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="rep", description="Моя репутация ⭐"),
         BotCommand(command="toprep", description="Топ репутации 🏆"),
         BotCommand(command="rules", description="Чат правила 📜"),
+        BotCommand(command="profile", description="Профиль 👤"),
+        BotCommand(command="remind", description="Напоминание ⏰"),
+        BotCommand(command="topact", description="Топ активности 🔥"),
         BotCommand(command="joke", description="Random joke 😂"),
         BotCommand(command="fact", description="Random fact 🧠"),
         BotCommand(command="weather", description="Weather 🌤"),
@@ -211,6 +214,10 @@ async def main() -> None:
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
+    # Register reaction handler
+    from handlers.reactions import on_reaction
+    dp.update.register(on_reaction)
+
     # ── Import and register routers ──────────────────────────────────────
     from handlers.start import router as start_router
     from handlers.protection.antispam import router as antispam_router
@@ -243,6 +250,8 @@ async def main() -> None:
     from handlers.protection.webapp import router as webapp_router
     from handlers.protection.ai_chat import router as ai_chat_router
     from handlers.relationships import router as relationships_router
+    from handlers.profile import router as profile_router
+    from handlers.remind import router as remind_router
 
     # ── Register middlewares ──────────────────────────────────────────────
     from middlewares.throttling import ThrottlingMiddleware
@@ -289,6 +298,8 @@ async def main() -> None:
     dp.include_router(utilities_router)
     dp.include_router(scheduler_router)
     dp.include_router(webapp_router)
+    dp.include_router(profile_router)
+    dp.include_router(remind_router)
     dp.include_router(relationships_router)
     dp.include_router(antispam_router)
     dp.include_router(moderation_router)

@@ -1,10 +1,10 @@
-"""Background scheduler — sends due posts automatically."""
+"""Background scheduler — sends due posts and reminders automatically."""
 
 import asyncio
 import logging
 
 from db.base import async_session_factory
-from db.queries import get_due_posts, update_post_last_sent
+from db.queries import get_due_posts, update_post_last_sent, get_due_reminders, mark_reminder_sent
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +74,23 @@ async def _scheduler_loop(bot) -> None:
                         logger.warning("Failed to send scheduled post %s: %s", post.id, e)
         except Exception as e:
             logger.warning("Scheduler loop error: %s", e)
+
+        # Check reminders
+        try:
+            async with async_session_factory() as session:
+                due_reminders = await get_due_reminders(session)
+                for r in due_reminders:
+                    try:
+                        await bot.send_message(
+                            chat_id=r.chat_id,
+                            text=f"⏰ <b>Reminder:</b> {r.text}",
+                        )
+                        await mark_reminder_sent(session, r.id)
+                        logger.info("Reminder %s sent to chat %s", r.id, r.chat_id)
+                    except Exception as e:
+                        logger.warning("Failed to send reminder %s: %s", r.id, e)
+        except Exception as e:
+            logger.warning("Reminder loop error: %s", e)
 
         await asyncio.sleep(60)
 
