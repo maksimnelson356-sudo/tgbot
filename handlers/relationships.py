@@ -14,7 +14,7 @@ from db.queries import (
     get_user_marriages,
     propose_marriage,
 )
-from filters.chat_type import IsReplyTo
+from filters.chat_type import IsGroup, IsReplyTo
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -421,3 +421,35 @@ async def cmd_familytop(message: Message) -> None:
         lines.append(f"{emoji} {name} — {count} брак(ов)")
 
     await message.answer("\n".join(lines))
+
+
+# ── Text aliases: "Брак", "Мой брак", "Развод", "Топ семей" ───────────────────
+
+_MARRY_WORDS = {"брак", "браки"}
+_MARRIAGE_WORDS = {"мой брак"}
+_DIVORCE_WORDS = {"развод"}
+_FAMILYTOP_WORDS = {"топ семей"}
+
+
+@router.message(F.text.lower().in_(_MARRY_WORDS), IsReplyTo(), IsGroup())
+async def text_marry(message: Message) -> None:
+    """Reply with 'Брак' to propose marriage."""
+    await cmd_marry(message)
+
+
+@router.message(F.text.lower().in_(_MARRIAGE_WORDS), IsGroup())
+async def text_marriage(message: Message) -> None:
+    """Type 'Мой брак' to show marriage status."""
+    await cmd_marriage(message)
+
+
+@router.message(F.text.lower().in_(_DIVORCE_WORDS), IsGroup())
+async def text_unmarry(message: Message) -> None:
+    """Type 'Развод' to initiate divorce."""
+    await cmd_unmarry(message)
+
+
+@router.message(F.text.lower().in_(_FAMILYTOP_WORDS), IsGroup())
+async def text_familytop(message: Message) -> None:
+    """Type 'Топ семей' to show family leaderboard."""
+    await cmd_familytop(message)
