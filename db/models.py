@@ -41,7 +41,6 @@ class Chat(Base):
     )
 
     members = relationship("ChatMember", back_populates="chat")
-    action_logs = relationship("ActionLog", back_populates="chat")
     warnings = relationship("Warning", back_populates="chat")
 
 
@@ -104,8 +103,6 @@ class ActionLog(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.now
     )
-
-    chat = relationship("Chat", back_populates="action_logs")
 
 
 class GameStats(Base):
