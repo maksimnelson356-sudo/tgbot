@@ -5,6 +5,7 @@ from aiogram.types import Message
 from db.base import async_session_factory
 from db.queries import get_or_create_chat
 from filters.chat_type import IsGroup
+from utils.helpers import escape_html
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -30,15 +31,15 @@ async def cmd_report(message: Message) -> None:
 
     # Build report text
     if reported_user:
-        offender_line = f"👤 Offender: {reported_user.first_name} (ID: {reported_user.id})"
+        offender_line = f"👤 Offender: {escape_html(reported_user.first_name)} (ID: {reported_user.id})"
     else:
         offender_line = "👤 Offender: anonymous/channel"
 
     report_text = (
         f"🚨 <b>Report!</b>\n\n"
-        f"👤 Reporter: {reporter.first_name} (ID: {reporter.id})\n"
+        f"👤 Reporter: {escape_html(reporter.first_name)} (ID: {reporter.id})\n"
         f"{offender_line}\n"
-        f"📝 Reason: {reason}\n"
+        f"📝 Reason: {escape_html(reason)}\n"
         f"💬 <a href='{reported_msg.get_url()}'>Jump to message</a>"
     )
 
@@ -53,8 +54,8 @@ async def cmd_report(message: Message) -> None:
                 try:
                     await message.bot.send_message(
                         admin.user.id,
-                        f"🚨 <b>Report from {reporter.first_name}</b>\n\n{reason}\n\n"
-                        f"Chat: {message.chat.title}\n"
+                        f"🚨 <b>Report from {escape_html(reporter.first_name)}</b>\n\n{escape_html(reason)}\n\n"
+                        f"Chat: {escape_html(message.chat.title)}\n"
                         f"<a href='{reported_msg.get_url()}'>View message</a>",
                     )
                 except Exception:
@@ -83,7 +84,7 @@ async def cmd_calladmin(message: Message) -> None:
                 if admin.user.username:
                     admin_mentions.append(f"@{admin.user.username}")
                 else:
-                    admin_mentions.append(f"<b>{admin.user.first_name}</b>")
+                    admin_mentions.append(f"<b>{escape_html(admin.user.first_name)}</b>")
     except Exception:
         admin_mentions.append("Admins")
 
@@ -97,8 +98,8 @@ async def cmd_calladmin(message: Message) -> None:
 
     await message.answer(
         f"🚨 <b>Admin call!</b>\n\n"
-        f"👤 From: {message.from_user.first_name}\n"
-        f"📝 Reason: {reason}"
+        f"👤 From: {escape_html(message.from_user.first_name)}\n"
+        f"📝 Reason: {escape_html(reason)}"
         f"{context}\n\n"
         f"{mentions}",
     )
@@ -111,9 +112,9 @@ async def cmd_calladmin(message: Message) -> None:
                 try:
                     await message.bot.send_message(
                         admin.user.id,
-                        f"🚨 <b>Admin call in {message.chat.title}</b>\n\n"
-                        f"👤 From: {message.from_user.first_name} (ID: {message.from_user.id})\n"
-                        f"📝 Reason: {reason}",
+                        f"🚨 <b>Admin call in {escape_html(message.chat.title)}</b>\n\n"
+                        f"👤 From: {escape_html(message.from_user.first_name)} (ID: {message.from_user.id})\n"
+                        f"📝 Reason: {escape_html(reason)}",
                     )
                 except Exception:
                     pass

@@ -39,24 +39,40 @@ _TRIVIA_QUESTIONS_RU = [
 
 @router.message(Command("dice"))
 async def cmd_dice(message: Message) -> None:
-    """Send a random dice result."""
-    await message.answer_dice(emoji="🎲")
-    async with async_session_factory() as session:
-        await get_or_create_user(
-            session, telegram_id=message.from_user.id,
-            username=message.from_user.username,
-            first_name=message.from_user.first_name,
-        )
+    """Send a random dice and record the result."""
+    await _play_dice_game(message, emoji="🎲", game_type="dice")
 
 
 @router.message(Command("dart"))
 async def cmd_dart(message: Message) -> None:
-    await message.answer_dice(emoji="🎯")
+    await _play_dice_game(message, emoji="🎯", game_type="dart")
 
 
 @router.message(Command("bowling"))
 async def cmd_bowling(message: Message) -> None:
-    await message.answer_dice(emoji="🎳")
+    await _play_dice_game(message, emoji="🎳", game_type="bowling")
+
+
+async def _play_dice_game(message: Message, emoji: str, game_type: str) -> None:
+    """Send an animated dice game and persist the outcome to GameStats.
+
+    The Bot API returns the final dice value immediately in the response.
+    Outcome rule: value >= 4 counts as a win.
+    """
+    sent = await message.answer_dice(emoji=emoji)
+    value = sent.dice.value if sent.dice else 0
+    outcome = "win" if value >= 4 else "loss"
+
+    async with async_session_factory() as session:
+        user = await get_or_create_user(
+            session, telegram_id=message.from_user.id,
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+        )
+        await update_game_stats(
+            session, user.id, game_type, outcome,
+            chat_telegram_id=message.chat.id,
+        )
 
 
 @router.message(Command("rps"))
@@ -96,7 +112,7 @@ async def cmd_rps(message: Message) -> None:
             session, telegram_id=message.from_user.id,
         )
         await update_game_stats(
-            session, user.id, "rps", outcome, chat_id=message.chat.id,
+            session, user.id, "rps", outcome, chat_telegram_id=message.chat.id,
         )
 
     await message.answer(
@@ -142,7 +158,7 @@ async def cmd_guess(message: Message) -> None:
 
         async with async_session_factory() as session:
             user = await get_or_create_user(session, telegram_id=message.from_user.id)
-            await update_game_stats(session, user.id, "guess", outcome, chat_id=message.chat.id)
+            await update_game_stats(session, user.id, "guess", outcome, chat_telegram_id=message.chat.id)
 
         await message.answer(text_result)
     else:
@@ -186,7 +202,7 @@ async def cmd_trivia(message: Message) -> None:
 
     async with async_session_factory() as session:
         user = await get_or_create_user(session, telegram_id=message.from_user.id)
-        await update_game_stats(session, user.id, "trivia", outcome, chat_id=message.chat.id)
+        await update_game_stats(session, user.id, "trivia", outcome, chat_telegram_id=message.chat.id)
 
     text_result = t("trivia_correct", lang) if outcome == "win" else t("trivia_wrong", lang)
     await message.answer(text_result)

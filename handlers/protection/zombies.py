@@ -42,70 +42,45 @@ async def cmd_zombies(message: Message) -> None:
         abandoned = 0
         bots = 0
         errors = 0
-        offset = 0
-        seen_ids = set()
 
-        while True:
-            try:
-                participants = await client.get_participants(chat, limit=200)
-            except Exception as e:
-                logger.warning("Telethon batch error: %s", e)
-                await asyncio.sleep(5)
+        # iter_participants auto-paginates through ALL members (>200 too)
+        async for user in client.iter_participants(chat):
+            count += 1
+
+            if count % 200 == 0:
                 try:
-                    participants = await client.get_participants(chat, limit=200)
+                    await status_msg.edit_text(
+                        f"🔍 Проверено {count} участников...\n"
+                        f"🧟 Удалённых: {deleted} | Заброшенных: {abandoned}"
+                    )
+                except Exception:
+                    pass
+                await asyncio.sleep(1)
+
+            if user.bot:
+                bots += 1
+                continue
+
+            # Deleted accounts
+            if not user.first_name or user.id == 777000:
+                try:
+                    await message.bot.ban_chat_member(
+                        chat_id=message.chat.id,
+                        user_id=user.id,
+                    )
+                    await message.bot.unban_chat_member(
+                        chat_id=message.chat.id,
+                        user_id=user.id,
+                    )
+                    deleted += 1
                 except Exception:
                     errors += 1
-                    break
+                    await asyncio.sleep(1)
+                continue
 
-            if not participants:
-                break
-
-            new_count = 0
-            for user in participants:
-                if user.id in seen_ids:
-                    continue
-                seen_ids.add(user.id)
-                new_count += 1
-                count += 1
-
-                if user.bot:
-                    bots += 1
-                    continue
-
-                # Deleted accounts
-                if not user.first_name or user.id == 777000:
-                    try:
-                        await message.bot.ban_chat_member(
-                            chat_id=message.chat.id,
-                            user_id=user.id,
-                        )
-                        await message.bot.unban_chat_member(
-                            chat_id=message.chat.id,
-                            user_id=user.id,
-                        )
-                        deleted += 1
-                    except Exception:
-                        errors += 1
-                    continue
-
-                # Abandoned: no profile photo
-                if user.photo is None:
-                    abandoned += 1
-
-            if new_count == 0:
-                break
-
-            offset += new_count
-
-            try:
-                await status_msg.edit_text(
-                    f"🔍 Проверено {count} участников...\n"
-                    f"🧟 Удалённых: {deleted} | Заброшенных: {abandoned}"
-                )
-            except Exception:
-                pass
-
-            await asyncio.sleep(1)
+            # Abandoned: no profile photo
+            if user.photo is None:
+                abandoned += 1
 
         await asyncio.sleep(3)
 

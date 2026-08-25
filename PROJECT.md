@@ -5,7 +5,7 @@
 
 ## Быстрые ссылки
 - **Локально**: D:\Scripts\tgbot
-- **VPS**: /opt/tgbot (2.26.105.72, Debian 12, Python 3.11)
+- **VPS**: /opt/tgbot (VPS, Debian 12, Python 3.11)
 - **GitHub**: https://github.com/maksimnelson356-sudo/tgbot.git
 - **Mini App**: https://maksimnelson356-sudo.github.io/tgbot/static/admin_panel.html
 

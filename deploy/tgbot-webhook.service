@@ -4,12 +4,17 @@ After=network.target
 
 [Service]
 Type=simple
-User=root
+User=tgbot
+Group=tgbot
 WorkingDirectory=/opt/tgbot/deploy
 ExecStart=/usr/bin/python3 /opt/tgbot/deploy/webhook_server.py
-Environment=WEBHOOK_SECRET=my_secret_token_change_me
+EnvironmentFile=/opt/tgbot/.env
 Restart=always
 RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

@@ -4,6 +4,8 @@ from aiogram.types import Message
 
 from db.base import async_session_factory
 from db.queries import (
+    count_rep_given_today,
+    get_last_rep_given_at,
     get_or_create_chat,
     get_or_create_user,
     get_reputation,
@@ -11,20 +13,21 @@ from db.queries import (
     give_reputation,
 )
 from filters.chat_type import IsGroup
+from utils.helpers import display_name, escape_html, keep_next
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
 router = Router()
 router.name = "reputation"
 
-# Cooldown tracking: (chat_id, giver_id) -> timestamp
-_cooldowns: dict[tuple[int, int], float] = {}
+RATE_COOLDOWN = 30 * 60      # 30 min per giver→target pair per chat
+DAILY_REP_LIMIT = 10         # max rep one user can hand out per day
 
 
 @router.message(Command("rate"), IsGroup())
 async def cmd_rate(message: Message) -> None:
     """Give reputation to a user. Usage: /rate <reply>"""
-    import time
+    import datetime
 
     if message.reply_to_message is None or message.reply_to_message.from_user is None:
         await message.answer("Reply to a user to give them reputation!")
@@ -40,21 +43,29 @@ async def cmd_rate(message: Message) -> None:
         await message.answer("You can't rate bots!")
         return
 
-    # Cooldown check (30 min per pair)
-    now = time.monotonic()
-    key = (message.chat.id, giver.id)
-    last = _cooldowns.get(key, 0)
-    if now - last < 10:  # 10 seconds to prevent spam
-        await message.answer("Wait a bit before rating again!")
-        return
-    _cooldowns[key] = now
-
     async with async_session_factory() as session:
         user = await get_or_create_user(session, telegram_id=target.id)
+        giver_db = await get_or_create_user(session, telegram_id=giver.id)
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
-        total = await give_reputation(session, chat.id, user.id, giver.id)
 
-    name = f"@{target.username}" if target.username else f"<b>{target.first_name}</b>"
+        # Anti-farm #1: cooldown per (giver → target) pair, persisted in DB.
+        last = await get_last_rep_given_at(session, chat.id, user.id, giver_db.id)
+        if last is not None:
+            elapsed = (datetime.datetime.now() - last).total_seconds()
+            if elapsed < RATE_COOLDOWN:
+                left = int((RATE_COOLDOWN - elapsed) // 60) + 1
+                await message.answer(f"⏳ You already rated this user. Try again in ~{left} min.")
+                return
+
+        # Anti-farm #2: daily cap on how many reps a giver may hand out.
+        given_today = await count_rep_given_today(session, chat.id, giver_db.id)
+        if given_today >= DAILY_REP_LIMIT:
+            await message.answer(f"🚫 Daily limit reached ({DAILY_REP_LIMIT} ratings per day).")
+            return
+
+        total = await give_reputation(session, chat.id, user.id, giver_db.id)
+
+    name = display_name(target)
     await message.answer(f"⭐ {name} — reputation: {total}")
 
     try:
@@ -77,7 +88,8 @@ async def cmd_rep(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         rep = await get_reputation(session, chat.id, user.id)
 
-    name = f"@{target.username}" if target.username else f"<b>{target.first_name}</b>"
+    name = display_name(target)
+    keep_next(message)
     await message.answer(f"⭐ {name} reputation: {rep}")
 
 
@@ -96,8 +108,9 @@ async def cmd_toprep(message: Message) -> None:
     for i, (user_id, rep) in enumerate(top, 1):
         async with async_session_factory() as session:
             user = await get_or_create_user(session, telegram_id=user_id)
-        name = user.first_name or f"User {user_id}"
+        name = escape_html(user.first_name or f"User {user_id}")
         emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "▫️"
         lines.append(f"{emoji} {name} — ⭐{rep}")
 
+    keep_next(message)
     await message.answer("\n".join(lines))

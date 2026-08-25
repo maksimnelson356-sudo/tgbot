@@ -6,6 +6,7 @@ from db.base import async_session_factory
 from db.queries import add_note, delete_note, get_or_create_chat, get_or_create_user, get_user_notes
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
+from utils.helpers import display_name, escape_html, keep_next
 
 router = Router()
 router.name = "notes"
@@ -31,7 +32,7 @@ async def cmd_note(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
 
         note = await add_note(session, chat.id, user.id, admin.id, text)
-        mention = f"@{target.username}" if target.username else f"<b>{target.first_name}</b>"
+        mention = display_name(target)
 
         await message.answer(f"📝 Note added for {mention} (ID: {note.id})")
 
@@ -52,7 +53,7 @@ async def cmd_notes(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         notes = await get_user_notes(session, chat.id, user.id)
 
-    mention = f"@{target.username}" if target.username else f"<b>{target.first_name}</b>"
+    mention = display_name(target)
 
     if not notes:
         await message.answer(f"No notes for {mention}.")
@@ -62,8 +63,9 @@ async def cmd_notes(message: Message) -> None:
     for i, n in enumerate(notes, 1):
         # Get admin name
         admin_name = f"admin#{n.admin_id}"
-        lines.append(f"{i}. [{n.id}] {n.text} ({n.created_at.strftime('%Y-%m-%d')})")
+        lines.append(f"{i}. [{n.id}] {escape_html(n.text)} ({n.created_at.strftime('%Y-%m-%d')})")
 
+    keep_next(message)
     await message.answer("\n".join(lines))
 
 
@@ -82,7 +84,8 @@ async def cmd_delnote(message: Message) -> None:
         return
 
     async with async_session_factory() as session:
-        success = await delete_note(session, note_id)
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        success = await delete_note(session, note_id, chat_id=chat.id)
         if success:
             await message.answer(f"✅ Note {note_id} deleted.")
         else:

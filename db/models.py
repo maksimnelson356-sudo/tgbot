@@ -19,6 +19,8 @@ class User(Base):
     last_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     language: Mapped[str] = mapped_column(String(8), default="ru")
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Internal users.id of the referrer (from /start ref_<id> deep links)
+    referred_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.now
     )
@@ -56,6 +58,12 @@ class ChatMember(Base):
     joined_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.now
     )
+    # ── Gamification (G2/G4) ─────────────────────────────────────────────
+    xp: Mapped[int] = mapped_column(Integer, default=0)
+    daily_streak: Mapped[int] = mapped_column(Integer, default=0)
+    last_daily_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, nullable=True)
+    # Internal users.id of whoever invited this member (invite-link attribution)
+    invited_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     chat = relationship("Chat", back_populates="members")
     user = relationship("User", back_populates="chat_memberships")

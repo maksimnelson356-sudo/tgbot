@@ -32,6 +32,19 @@ class ThrottlingMiddleware(BaseMiddleware):
         if event.from_user is None or event.chat is None:
             return await handler(event, data)
 
+        # Never throttle private chats — deleting user messages there is
+        # both rude and useless (no flood risk from one-on-one FSM flows).
+        if event.chat.type == "private":
+            return await handler(event, data)
+
+        # Admins are exempt
+        try:
+            member = await event.chat.get_member(event.from_user.id)
+            if member.status in ("creator", "administrator"):
+                return await handler(event, data)
+        except Exception:
+            pass
+
         chat_id = event.chat.id
         user_id = event.from_user.id
         now = time.monotonic()
@@ -43,6 +56,9 @@ class ThrottlingMiddleware(BaseMiddleware):
                 t for t in self.history[key]
                 if now - t < self.burst_window
             ]
+            if not self.history[key]:
+                del self.history[key]
+                self.history[key] = []
         else:
             self.history[key] = []
 

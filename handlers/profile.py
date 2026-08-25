@@ -13,6 +13,7 @@ from db.queries import (
     get_user_marriages,
 )
 from filters.chat_type import IsGroup
+from utils.helpers import escape_html, keep_next
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -35,8 +36,8 @@ async def cmd_profile(message: Message) -> None:
 
     lines = [
         f"👤 <b>{t('profile_title', lang)}</b>",
-        f"├ {t('profile_name', lang)}: <b>{target.first_name or ''} {target.last_name or ''}</b>",
-        f"├ {t('profile_username', lang)}: @{target.username}" if target.username else f"├ ID: {target.id}",
+        f"├ {t('profile_name', lang)}: <b>{escape_html(target.first_name or '')} {escape_html(target.last_name or '')}</b>",
+        f"├ {t('profile_username', lang)}: @{escape_html(target.username)}" if target.username else f"├ ID: {target.id}",
         f"├ {t('profile_id', lang)}: <code>{target.id}</code>",
         f"├ {t('profile_language', lang)}: {user.language or 'ru'}",
     ]
@@ -50,7 +51,7 @@ async def cmd_profile(message: Message) -> None:
         partner_id = active[0]["partner_id"]
         async with async_session_factory() as session:
             partner = await get_or_create_user(session, telegram_id=partner_id)
-        partner_name = partner.first_name or str(partner_id)
+        partner_name = escape_html(partner.first_name or str(partner_id))
         married_date = active[0]["married_at"].strftime("%d.%m.%Y") if active[0]["married_at"] else "?"
         lines.append(f"├ 💍 {t('marry_partner', lang)}: <b>{partner_name}</b> ({married_date})")
     else:
@@ -72,4 +73,5 @@ async def cmd_profile(message: Message) -> None:
     if user.created_at:
         lines.append(f"└ 📅 {t('profile_since', lang)}: {user.created_at.strftime('%d.%m.%Y')}")
 
+    keep_next(message)
     await message.answer("\n".join(lines))

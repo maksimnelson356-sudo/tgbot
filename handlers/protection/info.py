@@ -4,6 +4,7 @@ from aiogram.types import Message
 
 from db.base import async_session_factory
 from db.queries import get_chat_member, get_or_create_chat, get_or_create_user, get_user_warnings
+from utils.helpers import escape_html, keep_next
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -19,11 +20,12 @@ async def cmd_id(message: Message) -> None:
     if message.reply_to_message and message.reply_to_message.from_user:
         target = message.reply_to_message.from_user
         lines = [
-            f"👤 <b>{target.first_name}</b>",
+            f"👤 <b>{escape_html(target.first_name)}</b>",
             f"🆔 ID: <code>{target.id}</code>",
         ]
         if message.chat.type in ("group", "supergroup"):
             lines.append(f"💬 Chat ID: <code>{message.chat.id}</code>")
+        keep_next(message)
         await message.answer("\n".join(lines))
     else:
         lines = [
@@ -31,6 +33,7 @@ async def cmd_id(message: Message) -> None:
         ]
         if message.chat.type in ("group", "supergroup"):
             lines.append(f"💬 Chat ID: <code>{message.chat.id}</code>")
+        keep_next(message)
         await message.answer("\n".join(lines))
 
 
@@ -48,11 +51,11 @@ async def cmd_info(message: Message) -> None:
     if target is None:
         return
 
-    lines = [f"👤 <b>{target.first_name}</b>"]
+    lines = [f"👤 <b>{escape_html(target.first_name)}</b>"]
     if target.last_name:
-        lines.append(f"📛 Full name: {target.first_name} {target.last_name}")
+        lines.append(f"📛 Full name: {escape_html(target.first_name)} {escape_html(target.last_name)}")
     if target.username:
-        lines.append(f"📧 Username: @{target.username}")
+        lines.append(f"📧 Username: @{escape_html(target.username)}")
     lines.append(f"🆔 ID: <code>{target.id}</code>")
     if target.language_code:
         lines.append(f"🌐 Lang: {target.language_code}")
@@ -92,4 +95,5 @@ async def cmd_info(message: Message) -> None:
         except Exception:
             pass
 
+    keep_next(message)
     await message.answer("\n".join(lines))

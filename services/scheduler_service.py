@@ -1,24 +1,61 @@
 """Background scheduler — sends due posts and reminders automatically."""
 
 import asyncio
+import datetime
 import logging
+from typing import Optional
 
 from db.base import async_session_factory
-from db.queries import get_due_posts, update_post_last_sent, get_due_reminders, mark_reminder_sent
+from db.queries import (
+    deactivate_scheduled_post,
+    get_due_posts,
+    get_due_reminders,
+    mark_reminder_sent,
+    update_post_last_sent,
+)
+from utils.helpers import escape_html, spawn
 
 logger = logging.getLogger(__name__)
 
 _scheduler_task = None
 
+# Consecutive-failure counters for scheduled posts (in-memory backoff)
+_post_failures: dict[int, int] = {}
+_MAX_POST_FAILURES = 5
+
+_message_log_retention_days = 30
+_last_retention_date: Optional[datetime.date] = None
+
+
+async def _run_message_log_retention() -> None:
+    """Once a day, purge message_log rows older than the retention window."""
+    global _last_retention_date
+    today = datetime.date.today()
+    if _last_retention_date == today:
+        return
+    try:
+        from db.queries import delete_old_message_logs
+        async with async_session_factory() as session:
+            deleted = await delete_old_message_logs(session, _message_log_retention_days)
+        if deleted:
+            logger.info("MessageLog retention: deleted %d rows older than %dd",
+                        deleted, _message_log_retention_days)
+        _last_retention_date = today
+    except Exception as e:
+        logger.warning("MessageLog retention failed: %s", e)
+
 
 async def _scheduler_loop(bot) -> None:
     """Check for due posts every 60 seconds."""
+    global _post_failures
     logger.info("Scheduler loop started")
     while True:
         try:
             async with async_session_factory() as session:
                 due_posts = await get_due_posts(session)
                 for post in due_posts:
+                    if _post_failures.get(post.id, 0) >= _MAX_POST_FAILURES:
+                        continue
                     try:
                         if post.photo_file_id:
                             media_type = getattr(post, "media_type", None) or "photo"
@@ -69,9 +106,19 @@ async def _scheduler_loop(bot) -> None:
                                 text=post.text,
                             )
                         await update_post_last_sent(session, post.id)
+                        _post_failures.pop(post.id, None)
                         logger.info("Scheduled post %s sent to chat %s", post.id, post.chat_telegram_id)
                     except Exception as e:
-                        logger.warning("Failed to send scheduled post %s: %s", post.id, e)
+                        failures = _post_failures.get(post.id, 0) + 1
+                        _post_failures[post.id] = failures
+                        logger.warning("Failed to send scheduled post %s (%d/%d): %s",
+                                       post.id, failures, _MAX_POST_FAILURES, e)
+                        if failures >= _MAX_POST_FAILURES:
+                            async with async_session_factory() as s2:
+                                await deactivate_scheduled_post(s2, post.id)
+                            _post_failures.pop(post.id, None)
+                            logger.error("Scheduled post %s deactivated after %d failures",
+                                         post.id, failures)
         except Exception as e:
             logger.warning("Scheduler loop error: %s", e)
 
@@ -83,7 +130,7 @@ async def _scheduler_loop(bot) -> None:
                     try:
                         await bot.send_message(
                             chat_id=r.chat_id,
-                            text=f"⏰ <b>Reminder:</b> {r.text}",
+                            text=f"⏰ <b>Reminder:</b> {escape_html(r.text)}",
                         )
                         await mark_reminder_sent(session, r.id)
                         logger.info("Reminder %s sent to chat %s", r.id, r.chat_id)
@@ -92,14 +139,24 @@ async def _scheduler_loop(bot) -> None:
         except Exception as e:
             logger.warning("Reminder loop error: %s", e)
 
+        # Daily housekeeping
+        await _run_message_log_retention()
+
+        # Engagement hooks (self-throttled: run at most once per day)
+        try:
+            from services.engagement import check_birthdays, weekly_digest
+            await check_birthdays(bot)
+            await weekly_digest(bot)
+        except Exception as e:
+            logger.warning("Engagement hooks failed: %s", e)
+
         await asyncio.sleep(60)
 
 
 def start_scheduler(bot) -> None:
-    """Start the background scheduler task."""
+    """Start the background scheduler task (tracked — survives GC)."""
     global _scheduler_task
-    loop = asyncio.get_running_loop()
-    _scheduler_task = loop.create_task(_scheduler_loop(bot))
+    _scheduler_task = spawn(_scheduler_loop(bot), name="scheduler_loop")
     logger.info("Scheduler task created")
 
 

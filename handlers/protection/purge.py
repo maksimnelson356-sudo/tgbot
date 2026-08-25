@@ -27,8 +27,16 @@ async def cmd_purge(message: Message) -> None:
     reply_msg_id = message.reply_to_message.message_id
     current_msg_id = message.message_id
 
+    # Delete at most `count` messages ending at the command message,
+    # never more than what actually lies between the two IDs.
+    span = current_msg_id - reply_msg_id + 1
+    if span <= 0:
+        await message.answer("Invalid range — reply to an earlier message.")
+        return
+    to_delete = min(count, span)
+
     deleted = 0
-    for msg_id in range(reply_msg_id, current_msg_id + 1):
+    for msg_id in range(current_msg_id, current_msg_id - to_delete, -1):
         try:
             await message.bot.delete_message(chat_id=message.chat.id, message_id=msg_id)
             deleted += 1

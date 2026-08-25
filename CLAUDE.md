@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-purpose Telegram bot built with **aiogram 3** (async). Handles chat moderation, games, music, family/marriage system, and AI-powered features. Runs on VPS (2.26.105.72) via systemd + webhook auto-deploy.
+Multi-purpose Telegram bot built with **aiogram 3** (async). Handles chat moderation, games, music, family/marriage system, and AI-powered features. Runs on VPS via systemd + webhook auto-deploy.
 
 ## Running the Bot
 

@@ -3,30 +3,33 @@
 ## Как это работает
 
 ```
-Git push → GitHub вебхук → Webhook сервер (порт 9000) → deploy.sh → git pull → restart bot
+Git push → GitHub вебхук → Webhook сервер (127.0.0.1:9000) → deploy.sh → git pull → sudo systemctl restart tgbot
 ```
+
+Модель безопасности:
+- Вебхук-сервер работает от непривилегированного пользователя `tgbot`.
+- Секрет `WEBHOOK_SECRET` хранится только в `/opt/tgbot/.env` (не в гите), сервер не стартует без него.
+- Рестарт бота разрешён sudo-правилом только для одной команды (`systemctl restart tgbot`).
+- Наружу отдаётся только статус деплоя; полный вывод — в journald.
 
 ## Первоначальная настройка на VPS
 
-1. Скопируй файлы на VPS:
-   - `deploy/deploy.sh`
-   - `deploy/webhook_server.py`
-   - `deploy/setup.sh`
-   - `deploy/tgbot.service`
-   - `deploy/tgbot-webhook.service`
-
+1. Скопируй репозиторий на VPS и создай `.env` из `.env.example` (заполни токены).
 2. Запусти setup:
    ```bash
-   # Отредактируй REPO_URL в setup.sh
-   nano deploy/setup.sh
-   bash deploy/setup.sh
+   sudo bash deploy/setup.sh
    ```
-
-3. Настрой GitHub webhook:
+   Скрипт создаст системного пользователя `tgbot`, сгенерирует `WEBHOOK_SECRET`,
+   установит systemd-сервисы и sudo-правило.
+3. Посмотри сгенерированный секрет:
+   ```bash
+   grep WEBHOOK_SECRET /opt/tgbot/.env
+   ```
+4. Настрой GitHub webhook:
    - Репозиторий → Settings → Webhooks → Add webhook
-   - Payload URL: `http://ТВОЙ_IP:9000`
+   - Payload URL: `http://ТВОЙ_IP:9000` (лучше https через reverse-proxy)
    - Content type: `application/json`
-   - Secret: `my_secret_token_change_me`
+   - Secret: значение из `/opt/tgbot/.env`
    - Events: `Just the push event`
 
 ## Полезные команды
@@ -44,31 +47,19 @@ journalctl -u tgbot -f
 # Логи вебхука
 journalctl -u tgbot-webhook -f
 
+# Лог деплоя
+tail -f /opt/tgbot/deploy/deploy.log
+
 # Ручной деплой (без вебхука)
 cd /opt/tgbot && bash deploy/deploy.sh
 ```
 
-## Структура
-
-```
-/opt/tgbot/
-├── bot.py
-├── deploy/
-│   ├── deploy.sh           # Скрипт деплоя
-│   ├── webhook_server.py   # Вебхук-сервер
-│   ├── setup.sh            # Первичная настройка
-│   ├── tgbot.service       # Systemd для бота
-│   └── tgbot-webhook.service  # Systemd для вебхука
-├── handlers/
-├── ...
-└── requirements.txt
-```
-
 ## Порт 9000
 
-Открой порт в файрволе:
-```bash
-ufw allow 9000
-# или
-iptables -A INPUT -p tcp --dport 9000 -j ACCEPT
-```
+По умолчанию сервер слушает `127.0.0.1:9000` — снаружи недоступен.
+
+Варианты проброса наружу (по убыванию безопасности):
+1. **Reverse-proxy с TLS** (nginx + Let's Encrypt) → в GitHub указывай https-URL.
+2. **Файрвол по IP GitHub**: разреши порт 9000 только для [GitHub webhook IP-адресов](https://api.github.com/meta) (`hooks`), затем запусти сервис с `WEBHOOK_BIND=0.0.0.0` (через drop-in override).
+
+Открывать `9000` всему миру без TLS/фильтрации — нельзя.

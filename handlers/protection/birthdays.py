@@ -6,6 +6,7 @@ from aiogram.types import Message
 from db.base import async_session_factory
 from db.queries import get_or_create_chat, get_or_create_user, update_chat_settings
 from filters.chat_type import IsGroup
+from utils.helpers import escape_html
 
 router = Router()
 router.name = "birthdays"
@@ -58,7 +59,7 @@ async def cmd_birthdays(message: Message) -> None:
             from db.queries import get_or_create_user
             async with async_session_factory() as s:
                 user = await get_or_create_user(s, telegram_id=int(uid_str))
-            name = user.first_name or f"User {uid_str}"
+            name = escape_html(user.first_name or f"User {uid_str}")
             lines.append(f"  • {name} — {int(day)} числа 🎉")
 
     if len(lines) == 1:

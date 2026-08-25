@@ -15,6 +15,7 @@ from db.queries import (
     propose_marriage,
 )
 from filters.chat_type import IsGroup, IsReplyTo
+from utils.helpers import escape_html
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -86,9 +87,9 @@ async def cmd_marry(message: Message) -> None:
             return
 
     propose_text = (
-        t("marry_propose", lang, name=message.from_user.first_name or "")
+        t("marry_propose", lang, name=escape_html(message.from_user.first_name or ""))
         if lang == "ru"
-        else t("marry_propose_en", lang, name=message.from_user.first_name or "")
+        else t("marry_propose_en", lang, name=escape_html(message.from_user.first_name or ""))
     )
 
     kb = InlineKeyboardMarkup(
@@ -156,7 +157,7 @@ async def on_marry_accept(callback: CallbackQuery) -> None:
             await callback.answer(str(e), show_alert=True)
             return
 
-    partner_name_a = callback.from_user.first_name or f"User {callback.from_user.id}"
+    partner_name_a = escape_html(callback.from_user.first_name or f"User {callback.from_user.id}")
     proposer_text = t("marry_accepted", lang, name=partner_name_a)
 
     try:
@@ -252,7 +253,7 @@ async def cmd_unmarry(message: Message) -> None:
         try:
             await message.bot.send_message(
                 chat_id=partner_id,
-                text=t("marry_partner_divorced", lang, name=message.from_user.first_name or ""),
+                text=t("marry_partner_divorced", lang, name=escape_html(message.from_user.first_name or "")),
             )
         except Exception:
             pass
@@ -287,7 +288,7 @@ async def cmd_marriage(message: Message) -> None:
     async with async_session_factory() as session:
         partner = await get_or_create_user(session, telegram_id=partner_id)
 
-    partner_name = partner.first_name or f"User {partner_id}"
+    partner_name = escape_html(partner.first_name or f"User {partner_id}")
     married_date = (
         m["married_at"].strftime("%d.%m.%Y") if m["married_at"] else "Unknown"
     )
@@ -349,8 +350,11 @@ async def cmd_gift(message: Message) -> None:
         await message.answer(t("marry_not_partner", lang))
         return
 
-    # Check cooldown (24h between gifts to same person)
-    now = datetime.datetime.now().timestamp()
+    # Check cooldown (24h between gifts to same person) — same monotonic
+    # clock as /marriage status, otherwise the two disagree.
+    from time import monotonic
+
+    now = monotonic()
     cooldown_key = (message.from_user.id, target_id)
     last_gift = _daily_bonus_cooldown.get(cooldown_key, 0)
     if now - last_gift < _DAILY_BONUS_COOLDOWN:
@@ -375,14 +379,14 @@ async def cmd_gift(message: Message) -> None:
         )
 
     await message.answer(
-        t("marry_gift_sent", lang, name=partner.first_name or f"User {target_id}", total=total)
+        t("marry_gift_sent", lang, name=escape_html(partner.first_name or f"User {target_id}"), total=total)
     )
 
     # Also notify partner
     try:
         await message.bot.send_message(
             chat_id=target_id,
-            text=t("marry_gift_received", lang, name=message.from_user.first_name or ""),
+            text=t("marry_gift_received", lang, name=escape_html(message.from_user.first_name or "")),
         )
     except Exception:
         pass
@@ -417,7 +421,7 @@ async def cmd_familytop(message: Message) -> None:
     for i, (uid, count) in enumerate(sorted_users, 1):
         async with async_session_factory() as session:
             user = await get_or_create_user(session, telegram_id=uid)
-        name = user.first_name or f"User {uid}"
+        name = escape_html(user.first_name or f"User {uid}")
         emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "▫️"
         lines.append(f"{emoji} {name} — {count} брак(ов)")
 

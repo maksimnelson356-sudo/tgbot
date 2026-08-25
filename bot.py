@@ -66,6 +66,10 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="toprep", description="Топ репутации 🏆"),
         BotCommand(command="rules", description="Чат правила 📜"),
         BotCommand(command="profile", description="Профиль 👤"),
+        BotCommand(command="rank", description="Мой уровень 🏅"),
+        BotCommand(command="daily", description="Ежедневный бонус 🎁"),
+        BotCommand(command="topxp", description="Топ по опыту 🏆"),
+        BotCommand(command="inviters", description="Топ приглашателей 🫂"),
         BotCommand(command="remind", description="Напоминание ⏰"),
         BotCommand(command="topact", description="Топ активности 🔥"),
         BotCommand(command="joke", description="Random joke 😂"),
@@ -153,7 +157,8 @@ async def on_startup(bot: Bot) -> None:
 
     # Start auto-unmute background task
     from handlers.protection.utilities import auto_unmute_check
-    asyncio.create_task(auto_unmute_check(bot))
+    from utils.helpers import spawn
+    spawn(auto_unmute_check(bot), name="auto_unmute_loop")
     logger.info("Auto-unmute task started")
 
     # Set WebApp menu button for all chats
@@ -163,8 +168,21 @@ async def on_startup(bot: Bot) -> None:
 async def on_shutdown(bot: Bot) -> None:
     """Cleanup on shutdown."""
     from services.telethon_client import stop_client
+    from services.scheduler_service import stop_scheduler
+    from utils.helpers import shutdown_background_tasks
+    stop_scheduler()
+    await shutdown_background_tasks()
     await stop_client()
     logger.info("Bot shutting down...")
+
+
+async def on_error(event) -> None:
+    """Global error handler — log any unhandled exception from handlers."""
+    logger.error(
+        "Unhandled exception while processing update %s",
+        getattr(event, "update", event),
+        exc_info=getattr(event, "exception", None),
+    )
 
 
 async def main() -> None:
@@ -176,27 +194,43 @@ async def main() -> None:
 
     # ── Auto-delete bot messages in groups (15s) ─────────────────────────
     from aiogram.types import Message as _Msg
-    from utils.helpers import delete_after as _delete_after
+    from utils.helpers import schedule_delete as _schedule_delete
 
     _orig_answer = _Msg.answer
     _orig_reply = _Msg.reply
     _MEDIA_ATTRS = ("audio", "video", "photo", "animation", "document",
                     "voice", "video_note", "sticker")
 
+    def _should_auto_delete(result) -> bool:
+        return bool(
+            result and result.chat.type in ("group", "supergroup")
+            and not result.reply_markup
+            and not any(getattr(result, attr, None) for attr in _MEDIA_ATTRS)
+        )
+
     async def _auto_del_answer(self, *a, **kw):
+        # A handler may request a longer TTL via helpers.keep_next(msg, delay)
+        override = getattr(self, "_autodel_delay", None)
+        if override is not None:
+            try:
+                del self._autodel_delay
+            except AttributeError:
+                pass
         result = await _orig_answer(self, *a, **kw)
-        if (result and self.chat.type in ("group", "supergroup")
-                and not result.reply_markup
-                and not any(getattr(result, attr, None) for attr in _MEDIA_ATTRS)):
-            asyncio.create_task(_delete_after(result, 15.0))
+        if _should_auto_delete(result):
+            _schedule_delete(result, float(override) if override else 15.0)
         return result
 
     async def _auto_del_reply(self, *a, **kw):
+        override = getattr(self, "_autodel_delay", None)
+        if override is not None:
+            try:
+                del self._autodel_delay
+            except AttributeError:
+                pass
         result = await _orig_reply(self, *a, **kw)
-        if (result and self.chat.type in ("group", "supergroup")
-                and not result.reply_markup
-                and not any(getattr(result, attr, None) for attr in _MEDIA_ATTRS)):
-            asyncio.create_task(_delete_after(result, 15.0))
+        if _should_auto_delete(result):
+            _schedule_delete(result, float(override) if override else 15.0)
         return result
 
     _Msg.answer = _auto_del_answer
@@ -213,6 +247,7 @@ async def main() -> None:
     # Register lifecycle hooks
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
+    dp.errors.register(on_error)
 
     # Register reaction handler
     from handlers.reactions import on_reaction
@@ -252,6 +287,7 @@ async def main() -> None:
     from handlers.relationships import router as relationships_router
     from handlers.profile import router as profile_router
     from handlers.remind import router as remind_router
+    from handlers.xp import router as xp_router
 
     # ── Register middlewares ──────────────────────────────────────────────
     from middlewares.throttling import ThrottlingMiddleware
@@ -300,12 +336,26 @@ async def main() -> None:
     dp.include_router(webapp_router)
     dp.include_router(profile_router)
     dp.include_router(remind_router)
+    dp.include_router(xp_router)
     dp.include_router(relationships_router)
     dp.include_router(antispam_router)
     dp.include_router(moderation_router)
 
+    # Explicit allowed_updates: without message_reaction Telegram never
+    # delivers reaction updates (default excludes them), killing the rep system.
+    ALLOWED_UPDATES = [
+        "message",
+        "edited_message",
+        "callback_query",
+        "chat_member",
+        "my_chat_member",
+        "chat_join_request",
+        "message_reaction",
+        "message_reaction_count",
+    ]
+
     logger.info("Starting polling...")
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, allowed_updates=ALLOWED_UPDATES)
 
 
 if __name__ == "__main__":

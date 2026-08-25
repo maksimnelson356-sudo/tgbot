@@ -4,6 +4,7 @@ from aiogram.types import Message
 
 from db.base import async_session_factory
 from db.queries import get_or_create_user, get_top_players
+from utils.helpers import escape_html, keep_next
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -34,7 +35,7 @@ async def cmd_top(message: Message) -> None:
         uid = user.id
         if uid not in user_data:
             user_data[uid] = {
-                "name": user.first_name or f"User {user.telegram_id}",
+                "name": escape_html(user.first_name or f"User {user.telegram_id}"),
                 "games": [],
             }
         total = stats.wins + stats.losses + stats.draws
@@ -61,6 +62,7 @@ async def cmd_top(message: Message) -> None:
                     gname = t(f"game_{s.game_type}", lang, default=s.game_type)
                     lines.append(f"   {gname}: {s.wins}W / {s.losses}L / {s.draws}D")
 
+    keep_next(message)
     await message.answer("\n".join(lines))
 
 
@@ -83,7 +85,7 @@ async def cmd_stats(message: Message) -> None:
         await message.answer(t("stats_empty", lang))
         return
 
-    lines = [t("stats_title", lang, name=message.from_user.first_name)]
+    lines = [t("stats_title", lang, name=escape_html(message.from_user.first_name))]
     total_wins = total_losses = total_draws = 0
     for s in all_stats:
         gname = t(f"game_{s.game_type}", lang, default=s.game_type)
@@ -97,4 +99,5 @@ async def cmd_stats(message: Message) -> None:
         win_rate = total_wins / total * 100
         lines.append(t("stats_overall", lang, total=total, win_rate=win_rate))
 
+    keep_next(message)
     await message.answer("\n".join(lines))

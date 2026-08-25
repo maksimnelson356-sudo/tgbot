@@ -23,10 +23,29 @@ from filters.admin import HasRank
 from filters.chat_type import IsGroup, IsReplyTo
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
-from utils.helpers import get_user_mention
+from utils.helpers import escape_html, get_user_mention, keep_next
 
 router = Router()
 router.name = "warnings"
+
+# Standard member rights restored after unmute / captcha pass.
+# Elevated flags stay off — regular members must not get pin/change-info rights.
+DEFAULT_MEMBER_PERMISSIONS = ChatPermissions(
+    can_send_messages=True,
+    can_send_audios=True,
+    can_send_documents=True,
+    can_send_photos=True,
+    can_send_videos=True,
+    can_send_video_notes=True,
+    can_send_voice_notes=True,
+    can_send_polls=True,
+    can_send_other_messages=True,
+    can_add_web_page_previews=True,
+    can_change_info=False,
+    can_invite_users=False,
+    can_pin_messages=False,
+    can_manage_topics=False,
+)
 
 _DURATION_RE = re.compile(r"(\d+)\s*(m|min|h|hour|d|day|s|sec)?", re.IGNORECASE)
 
@@ -76,7 +95,7 @@ async def _do_warn(message: Message, reason: str = "No reason provided") -> None
         warn_count = await increment_warnings(session, chat.id, user.id)
 
         mention = get_user_mention(target)
-        await message.answer(t("warn_message", lang, user=mention, count=warn_count, reason=reason))
+        await message.answer(t("warn_message", lang, user=mention, count=warn_count, reason=escape_html(reason)))
         await log_action(session, chat.id, user.id, "warned", admin_id=admin.id, details=reason)
 
         max_warnings = (chat.settings or {}).get("max_warnings", 3)
@@ -101,13 +120,8 @@ async def _do_mute(message: Message, args: str = "") -> None:
         if len(parts) > 1:
             reason = parts[1]
 
-    async with async_session_factory() as session:
-        user = await get_or_create_user(session, telegram_id=target.id)
-        admin = await get_or_create_user(session, telegram_id=message.from_user.id)
-        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
-        await mute_member(session, chat.id, user.id, duration)
-        await log_action(session, chat.id, user.id, "muted", admin_id=admin.id, details=f"{duration}s: {reason}")
-
+    # Restrict on Telegram first — only then persist the mute flag,
+    # otherwise a failed restrict leaves phantom mutes in /mutelist.
     try:
         until_date = datetime.datetime.now() + datetime.timedelta(seconds=duration)
         await message.bot.restrict_chat_member(
@@ -116,9 +130,18 @@ async def _do_mute(message: Message, args: str = "") -> None:
             permissions=ChatPermissions(can_send_messages=False),
             until_date=until_date,
         )
-        await message.answer(t("mute_message", lang, user=get_user_mention(target), duration=_format_duration(duration), reason=reason))
     except Exception as e:
         await message.answer(f"⚠️ Cannot restrict: {e}. Make bot admin!")
+        return
+
+    async with async_session_factory() as session:
+        user = await get_or_create_user(session, telegram_id=target.id)
+        admin = await get_or_create_user(session, telegram_id=message.from_user.id)
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        await mute_member(session, chat.id, user.id, duration)
+        await log_action(session, chat.id, user.id, "muted", admin_id=admin.id, details=f"{duration}s: {reason}")
+
+    await message.answer(t("mute_message", lang, user=get_user_mention(target), duration=_format_duration(duration), reason=escape_html(reason)))
 
 
 async def _do_ban(message: Message, reason: str = "No reason") -> None:
@@ -140,7 +163,7 @@ async def _do_ban(message: Message, reason: str = "No reason") -> None:
         return
 
     mention = get_user_mention(target)
-    await message.answer(f"🔨 <b>{mention}</b> забанен. Причина: {reason}")
+    await message.answer(f"🔨 {mention} забанен. Причина: {escape_html(reason)}")
 
     async with async_session_factory() as session:
         user = await get_or_create_user(session, telegram_id=target.id)
@@ -213,22 +236,7 @@ async def cmd_unmute(message: Message) -> None:
         await message.bot.restrict_chat_member(
             chat_id=message.chat.id,
             user_id=target.id,
-            permissions=ChatPermissions(
-                can_send_messages=True,
-                can_send_audios=True,
-                can_send_documents=True,
-                can_send_photos=True,
-                can_send_videos=True,
-                can_send_video_notes=True,
-                can_send_voice_notes=True,
-                can_send_polls=True,
-                can_send_other_messages=True,
-                can_add_web_page_previews=True,
-                can_invite_users=True,
-                can_change_info=True,
-                can_pin_messages=True,
-                can_manage_topics=True,
-            ),
+            permissions=DEFAULT_MEMBER_PERMISSIONS,
         )
     except Exception as e:
         await message.answer(f"⚠️ Cannot unrestrict: {e}")
@@ -265,6 +273,7 @@ async def cmd_list_warnings(message: Message) -> None:
     for i, w in enumerate(warnings, 1):
         lines.append(f"{i}. {w.reason or 'No reason'} ({w.created_at.strftime('%Y-%m-%d %H:%M')})")
 
+    keep_next(message)
     await message.answer("\n".join(lines))
 
 

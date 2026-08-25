@@ -124,8 +124,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "mod_profanity": "Мат: {word}",
         "mod_links": "Ссылки запрещены",
         "mod_media": "Медиа запрещены",
-        "mod_muted": "{user} замучен ({count}/3) — {reason}",
-        "mod_warned": "{user}, предупреждение {count}/3: {reason}",
+        "mod_muted": "{user} замучен ({count}/{max}) — {reason}",
+        "mod_warned": "{user}, предупреждение {count}/{max}: {reason}",
+        "mod_forward_warned": "⚠️ {user}, пересылка сообщений запрещена. Предупреждение {count}/{max}",
 
         # Captcha
         "captcha_prompt": "🔐 <b>Добро пожаловать!</b>\n\nЧтобы подтвердить, что ты не бот, введи код с картинки:\n⏳ У тебя 60 секунд",
@@ -342,8 +343,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "mod_profanity": "Profanity: {word}",
         "mod_links": "Links not allowed",
         "mod_media": "Media not allowed",
-        "mod_muted": "{user} muted ({count}/3) — {reason}",
-        "mod_warned": "{user}, warning {count}/3: {reason}",
+        "mod_muted": "{user} muted ({count}/{max}) — {reason}",
+        "mod_warned": "{user}, warning {count}/{max}: {reason}",
+        "mod_forward_warned": "⚠️ {user}, forwarding messages is not allowed here. Warning {count}/{max}",
 
         # Captcha
         "captcha_prompt": "🔐 <b>Welcome!</b>\n\nTo prove you're not a bot, enter the code from the image:\n⏳ You have 60 seconds",

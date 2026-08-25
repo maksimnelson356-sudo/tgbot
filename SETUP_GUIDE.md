@@ -53,7 +53,7 @@
 
 Открой терминал (PowerShell / Terminal) и подключись:
 ```bash
-ssh root@2.26.105.72
+ssh root@YOUR_SERVER_IP
 ```
 Введи пароль от root.
 

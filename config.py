@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     )
 
     BOT_TOKEN: str
-    DATABASE_URL: str = "sqlite+aiosqlite:///tgbot.db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///data/tgbot.db"
     LOG_LEVEL: str = "INFO"
 
     # Throttling defaults

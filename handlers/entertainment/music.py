@@ -17,6 +17,7 @@ from aiogram.types import (
 )
 
 from services.music_service import search, download_track
+from utils.helpers import escape_html
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -92,12 +93,12 @@ def _build_results_keyboard(tracks: list, cache_key: str, page: int = 0) -> Inli
 async def _do_search(message: Message, query: str) -> None:
     lang = await get_user_lang(message)
     user_id = message.from_user.id if message.from_user else 0
-    searching = await message.answer(t("music_searching", lang, query=query))
+    searching = await message.answer(t("music_searching", lang, query=escape_html(query)))
 
     tracks = await search(query, limit=20)
 
     if not tracks:
-        await searching.edit_text(t("music_not_found", lang, query=query))
+        await searching.edit_text(t("music_not_found", lang, query=escape_html(query)))
         return
 
     # Deduplicate by artist+title (case-insensitive)
@@ -113,7 +114,7 @@ async def _do_search(message: Message, query: str) -> None:
     key = _put_cache(query, tracks, user_id)
     kb = _build_results_keyboard(tracks, key, page=0)
     await searching.edit_text(
-        f"🎶 <b>{query}</b> — {len(tracks)} треков:",
+        f"🎶 <b>{escape_html(query)}</b> — {len(tracks)} треков:",
         reply_markup=kb,
     )
 
@@ -171,7 +172,7 @@ async def on_music_pick(callback: CallbackQuery) -> None:
         audio=BufferedInputFile(audio.read(), filename=audio.name),
         title=track.title,
         performer=track.artist,
-        caption=f"🎵 {track.artist} — {track.title}\n⏱ {_format_duration(track.duration)}",
+        caption=f"🎵 {escape_html(track.artist)} — {escape_html(track.title)}\n⏱ {escape_html(_format_duration(track.duration))}",
     )
 
 

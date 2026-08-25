@@ -1,11 +1,14 @@
 import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ActionLog, BannedSticker, Chat, ChatMember, GameStats, Marriage, MessageLog, Note, Reputation, User, Warning
+
+if TYPE_CHECKING:  # runtime imports are lazy inside the functions that use them
+    from db.models import Reminder, ScheduledPost
 
 
 # ── User ──────────────────────────────────────────────────────────────────────
@@ -195,7 +198,8 @@ async def unmute_member(session: AsyncSession, chat_id: int, user_id: int) -> No
 # ── Warnings ──────────────────────────────────────────────────────────────────
 
 async def add_warning(
-    session: AsyncSession, chat_id: int, user_id: int, admin_id: int, reason: Optional[str] = None
+    session: AsyncSession, chat_id: int, user_id: int,
+    admin_id: Optional[int] = None, reason: Optional[str] = None
 ) -> Warning:
     warn = Warning(chat_id=chat_id, user_id=user_id, admin_id=admin_id, reason=reason)
     session.add(warn)
@@ -242,8 +246,11 @@ async def get_user_notes(
     return list(result.scalars().all())
 
 
-async def delete_note(session: AsyncSession, note_id: int) -> bool:
-    note = await session.get(Note, note_id)
+async def delete_note(session: AsyncSession, note_id: int, chat_id: Optional[int] = None) -> bool:
+    stmt = select(Note).where(Note.id == note_id)
+    if chat_id is not None:
+        stmt = stmt.where(Note.chat_id == chat_id)
+    note = (await session.execute(stmt)).scalar_one_or_none()
     if note is None:
         return False
     await session.delete(note)
@@ -264,6 +271,39 @@ async def give_reputation(
     from sqlalchemy import select, func
     stmt = select(func.count(Reputation.id)).where(
         Reputation.chat_id == chat_id, Reputation.user_id == user_id
+    )
+    result = await session.execute(stmt)
+    return result.scalar() or 0
+
+
+async def get_last_rep_given_at(
+    session: AsyncSession, chat_id: int, target_user_id: int, giver_user_id: int
+) -> Optional[datetime.datetime]:
+    """Timestamp of the last rep the giver gave to this target in this chat."""
+    stmt = (
+        select(Reputation.created_at)
+        .where(
+            Reputation.chat_id == chat_id,
+            Reputation.user_id == target_user_id,
+            Reputation.given_by == giver_user_id,
+        )
+        .order_by(Reputation.created_at.desc())
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def count_rep_given_today(
+    session: AsyncSession, chat_id: int, giver_user_id: int
+) -> int:
+    """How many rep points the giver has handed out in this chat today."""
+    from sqlalchemy import select, func
+    day_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    stmt = select(func.count(Reputation.id)).where(
+        Reputation.chat_id == chat_id,
+        Reputation.given_by == giver_user_id,
+        Reputation.created_at >= day_start,
     )
     result = await session.execute(stmt)
     return result.scalar() or 0
@@ -305,8 +345,14 @@ async def update_game_stats(
     user_id: int,
     game_type: str,
     outcome: str,  # 'win', 'loss', 'draw'
-    chat_id: Optional[int] = None,
+    chat_telegram_id: Optional[int] = None,
 ) -> GameStats:
+    # Resolve internal chats.id PK from the Telegram chat id
+    chat_pk: Optional[int] = None
+    if chat_telegram_id is not None:
+        chat = await get_or_create_chat(session, telegram_id=chat_telegram_id)
+        chat_pk = chat.id
+
     # Ensure row exists
     stmt = select(GameStats).where(
         GameStats.user_id == user_id,
@@ -318,7 +364,7 @@ async def update_game_stats(
     if stats is None:
         stats = GameStats(
             user_id=user_id,
-            chat_id=chat_id,
+            chat_id=chat_pk,
             game_type=game_type,
             wins=0,
             losses=0,
@@ -584,6 +630,8 @@ async def add_scheduled_post(
         media_type=media_type,
         interval_hours=interval_hours,
         created_by=created_by,
+        # Seed so interval posts don't fire instantly after creation
+        last_sent_at=datetime.datetime.now(),
     )
     session.add(post)
     await session.commit()
@@ -631,9 +679,187 @@ async def update_post_last_sent(session: AsyncSession, post_id: int) -> None:
         await session.commit()
 
 
-async def delete_scheduled_post(session: AsyncSession, post_id: int) -> bool:
+async def deactivate_scheduled_post(session: AsyncSession, post_id: int) -> None:
+    """Disable a post after repeated send failures."""
     from db.models import ScheduledPost
     post = await session.get(ScheduledPost, post_id)
+    if post:
+        post.is_active = False
+        await session.commit()
+
+
+async def delete_old_message_logs(session: AsyncSession, days: int = 30) -> int:
+    """Retention job: delete message log rows older than N days. Returns count."""
+    from db.models import MessageLog
+    cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
+    from sqlalchemy import delete as sa_delete
+    result = await session.execute(sa_delete(MessageLog).where(MessageLog.created_at < cutoff))
+    await session.commit()
+    return result.rowcount or 0
+
+
+# ── XP / levels / daily bonus (G2) ────────────────────────────────────────────
+
+def level_for_xp(xp: int) -> int:
+    """Level thresholds: 100, 400, 900, 1600… → level = floor(sqrt(xp/100))."""
+    if xp <= 0:
+        return 0
+    return int((xp // 100) ** 0.5)
+
+
+def xp_for_level(level: int) -> int:
+    return 100 * max(level, 0) ** 2
+
+
+async def add_xp(
+    session: AsyncSession, chat_id: int, user_id: int, amount: int
+) -> tuple[int, int]:
+    """Add XP to a chat member. Returns (new_total_xp, new_level)."""
+    member = await get_chat_member(session, chat_id, user_id)
+    if member is None:
+        return 0, 0
+    member.xp = (member.xp or 0) + amount
+    await session.commit()
+    return member.xp, level_for_xp(member.xp)
+
+
+async def claim_daily(
+    session: AsyncSession, chat_id: int, user_id: int
+) -> tuple[bool, int, int]:
+    """Claim the daily streak bonus.
+
+    Returns (claimed, streak, xp_reward). Streak continues when claimed
+    on consecutive calendar days, otherwise resets to 1.
+    """
+    import datetime as _dt
+
+    member = await get_chat_member(session, chat_id, user_id)
+    if member is None:
+        return False, 0, 0
+
+    now = _dt.datetime.now()
+    last = member.last_daily_at
+    consecutive = False
+
+    if last is not None:
+        elapsed = (now - last).total_seconds()
+        if elapsed < 20 * 3600:  # less than ~a day — not yet
+            return False, member.daily_streak or 0, 0
+        consecutive = last.date() == (now - _dt.timedelta(days=1)).date()
+
+    if consecutive:
+        member.daily_streak = (member.daily_streak or 0) + 1
+    else:
+        member.daily_streak = 1
+
+    member.last_daily_at = now
+    streak = member.daily_streak
+    reward = 50 + min(streak - 1, 6) * 25  # 50..200
+    member.xp = (member.xp or 0) + reward
+    await session.commit()
+    return True, streak, reward
+
+
+async def top_xp(session: AsyncSession, chat_id: int, limit: int = 10):
+    """Top members by XP. Returns [(user_telegram_id, xp, level)]."""
+    from sqlalchemy import select
+    from db.models import ChatMember, User
+    stmt = (
+        select(User.telegram_id, ChatMember.xp)
+        .join(User, User.id == ChatMember.user_id)
+        .where(ChatMember.chat_id == chat_id)
+        .order_by(ChatMember.xp.desc())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return [(tg, xp or 0, level_for_xp(xp or 0)) for tg, xp in result.all()]
+
+
+async def count_invites(session: AsyncSession, chat_id: int, inviter_user_id: int) -> int:
+    """How many current members this user has invited to the chat."""
+    from sqlalchemy import select, func
+    from db.models import ChatMember
+    stmt = select(func.count(ChatMember.id)).where(
+        ChatMember.chat_id == chat_id,
+        ChatMember.invited_by == inviter_user_id,
+    )
+    result = await session.execute(stmt)
+    return result.scalar() or 0
+
+
+async def set_invited_by(
+    session: AsyncSession, chat_id: int, new_member_user_id: int, inviter_user_id: int
+) -> None:
+    """Attribute a join to an inviter (first write wins)."""
+    from db.models import ChatMember
+    member = await get_chat_member(session, chat_id, new_member_user_id)
+    if member is not None and member.invited_by is None:
+        member.invited_by = inviter_user_id
+        await session.commit()
+
+
+async def get_top_inviters(session: AsyncSession, chat_id: int, limit: int = 10):
+    """Top inviters: [(inviter_user_id, invite_count)]."""
+    from sqlalchemy import select, func
+    from db.models import ChatMember
+    stmt = (
+        select(ChatMember.invited_by, func.count(ChatMember.id))
+        .where(ChatMember.chat_id == chat_id, ChatMember.invited_by.isnot(None))
+        .group_by(ChatMember.invited_by)
+        .order_by(func.count(ChatMember.id).desc())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return [(uid, cnt) for uid, cnt in result.all()]
+
+
+async def set_referred_by(
+    session: AsyncSession, new_user_pk: int, referrer_telegram_id: int
+) -> bool:
+    """Store the referrer for a user (once). Returns True if newly credited."""
+    user = await session.get(User, new_user_pk)
+    if user is None or user.referred_by is not None:
+        return False
+    referrer = (
+        await session.execute(select(User).where(User.telegram_id == referrer_telegram_id))
+    ).scalar_one_or_none()
+    if referrer is None:
+        return False  # referrer has never talked to the bot — ignore
+    user.referred_by = referrer.id
+    await session.commit()
+    return True
+
+
+async def get_referred_by(session: AsyncSession, user_pk: int) -> Optional[int]:
+    """Internal users.id of this user's referrer, or None."""
+    user = await session.get(User, user_pk)
+    return user.referred_by if user else None
+
+
+async def count_prior_joins(session: AsyncSession, telegram_chat_id: int, telegram_user_id: int) -> int:
+    """How many times this user already joined this chat before now."""
+    from db.models import ActionLog
+    from sqlalchemy import select, func
+
+    chat = await get_or_create_chat(session, telegram_id=telegram_chat_id)
+    user = await get_or_create_user(session, telegram_id=telegram_user_id)
+    stmt = select(func.count(ActionLog.id)).where(
+        ActionLog.chat_id == chat.id,
+        ActionLog.user_id == user.id,
+        ActionLog.action_type == "joined",
+    )
+    result = await session.execute(stmt)
+    return result.scalar() or 0
+
+
+async def delete_scheduled_post(
+    session: AsyncSession, post_id: int, chat_telegram_id: Optional[int] = None
+) -> bool:
+    from db.models import ScheduledPost
+    stmt = select(ScheduledPost).where(ScheduledPost.id == post_id)
+    if chat_telegram_id is not None:
+        stmt = stmt.where(ScheduledPost.chat_telegram_id == chat_telegram_id)
+    post = (await session.execute(stmt)).scalar_one_or_none()
     if post is None:
         return False
     post.is_active = False

@@ -159,8 +159,9 @@ async def cmd_schedule_del(message: Message) -> None:
         return
 
     post_id = int(args)
+    # Scoped to this chat — admins must not touch other chats' posts.
     async with async_session_factory() as session:
-        deleted = await delete_scheduled_post(session, post_id)
+        deleted = await delete_scheduled_post(session, post_id, chat_telegram_id=message.chat.id)
 
     if deleted:
         await message.answer(t("schedule_deleted", lang, id=post_id))

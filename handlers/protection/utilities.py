@@ -12,6 +12,8 @@ from db.queries import add_note, get_or_create_chat, update_chat_settings
 from db.queries import get_or_create_user
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
+from handlers.protection.warnings import DEFAULT_MEMBER_PERMISSIONS
+from utils.helpers import display_name, escape_html, keep_next
 
 router = Router()
 router.name = "utilities"
@@ -62,8 +64,7 @@ async def cmd_admins(message: Message) -> None:
         for a in admins:
             user = a.user
             role = "👑 Creator" if a.status == "creator" else "🛡 Admin"
-            name = f"@{user.username}" if user.username else f"<b>{user.first_name}</b>"
-            lines.append(f"{role}: {name}")
+            lines.append(f"{role}: {display_name(user)}")
     except Exception:
         lines.append("(cannot fetch Telegram admin list)")
 
@@ -77,11 +78,11 @@ async def cmd_admins(message: Message) -> None:
         lines.append("")
         lines.append("🤖 <b>Bot admins:</b>")
         for a, rank in bot_admins:
-            name = f"@{a.username}" if a.username else f"<b>{a.first_name or 'Unknown'}</b>"
             rank_icons = {1: "🔰", 2: "🛡️", 3: "👑"}
             icon = rank_icons.get(rank, "❓")
-            lines.append(f"• {icon} {name}")
+            lines.append(f"• {icon} {display_name(a, 'Unknown')}")
 
+    keep_next(message)
     await message.answer("\n".join(lines))
 
 
@@ -112,11 +113,12 @@ async def cmd_mutelist(message: Message) -> None:
         from db.queries import get_user_by_id
         async with async_session_factory() as s:
             user = await get_user_by_id(s, m.user_id)
-        name = user.first_name if user else f"User #{m.user_id}"
+        name = escape_html(user.first_name) if user else f"User #{m.user_id}"
         remaining = ""
         if m.muted_until and m.muted_until > now:
             remaining = f" ({int((m.muted_until - now).total_seconds()//60)}min left)"
         lines.append(f"• {name}{remaining}")
+    keep_next(message)
     await message.answer("\n".join(lines))
 
 
@@ -124,20 +126,28 @@ async def cmd_mutelist(message: Message) -> None:
 
 @router.message(Command("clean"), IsGroup(), HasRank(2))
 async def cmd_clean(message: Message) -> None:
-    """Delete all bot messages in the last N messages."""
+    """Delete bot messages that are still awaiting scheduled auto-deletion.
+
+    The Bot API cannot enumerate chat history, so we track messages the bot
+    scheduled for auto-delete and remove them immediately on /clean.
+    """
+    from utils.helpers import pending_message_ids, pop_pending_delete
+
     status = await message.answer("🧹 Cleaning...")
     deleted = 0
+    for msg_id in pending_message_ids(message.chat.id):
+        task = pop_pending_delete(message.chat.id, msg_id)
+        if task is not None:
+            task.cancel()
+        try:
+            await message.bot.delete_message(message.chat.id, msg_id)
+            deleted += 1
+        except Exception:
+            pass
     try:
-        async for msg in message.chat.history(limit=200):
-            if msg.from_user and msg.from_user.id == message.bot.id:
-                try:
-                    await msg.delete()
-                    deleted += 1
-                except Exception:
-                    pass
         await status.edit_text(f"🧹 Deleted {deleted} bot messages.")
-    except Exception as e:
-        await status.edit_text(f"⚠️ Error: {e}")
+    except Exception:
+        pass
 
 
 # ── /allowlink ─────────────────────────────────────────────────────────────────
@@ -157,7 +167,7 @@ async def cmd_allowlink(message: Message) -> None:
         if domain not in allowed:
             allowed.append(domain)
             await update_chat_settings(session, chat.id, {"allowed_domains": allowed})
-        await message.answer(f"✅ Domain <b>{domain}</b> whitelisted!")
+        await message.answer(f"✅ Domain <b>{escape_html(domain)}</b> whitelisted!")
 
 
 # ── Auto-unmute (runs every 5 min via task) ───────────────────────────────────
@@ -183,15 +193,18 @@ async def auto_unmute_check(bot):
                 for m in expired:
                     m.is_muted = False
                     m.muted_until = None
-                    # Lift Telegram restriction
+                    # Lift Telegram restriction — restore full standard member
+                    # rights (media included), elevated rights stay off.
                     try:
                         chat_obj = await session.get(Chat, m.chat_id)
                         if chat_obj:
-                            await bot.restrict_chat_member(
-                                chat_id=chat_obj.telegram_id,
-                                user_id=(await session.get(User, m.user_id)).telegram_id,
-                                permissions=ChatPermissions(can_send_messages=True),
-                            )
+                            user_obj = await session.get(User, m.user_id)
+                            if user_obj:
+                                await bot.restrict_chat_member(
+                                    chat_id=chat_obj.telegram_id,
+                                    user_id=user_obj.telegram_id,
+                                    permissions=DEFAULT_MEMBER_PERMISSIONS,
+                                )
                     except Exception:
                         pass
                 await session.commit()

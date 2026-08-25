@@ -17,6 +17,7 @@ from db.queries import (
 from filters.chat_type import IsGroup
 from services.content_filter import has_email, has_phone
 from services.spam_detector import spam_detector
+from utils.helpers import display_name, escape_html
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -162,10 +163,7 @@ async def moderate_message(message: Message) -> None:
             if _URL_RE.search(text):
                 reason = t("mod_links", lang)
 
-        # Media
-        if reason is None and settings.get("filter_media", False):
-            if message.photo or message.video or message.animation or message.document:
-                reason = t("mod_media", lang)
+        # (Media filtering lives in moderate_filtered_media — text never has media.)
 
         # Anti-forward (block forwarded channel messages)
         if reason is None and settings.get("antiforward_enabled", False):
@@ -185,7 +183,9 @@ async def moderate_message(message: Message) -> None:
                     from services.ai_moderation import check_text
                     ai_result = await check_text(text, chat_id=message.chat.id)
                     if ai_result and not ai_result.get("allowed", True):
-                        reason = f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
+                        reason = escape_html(
+                            f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
+                        )
                 except Exception:
                     pass
 
@@ -195,11 +195,11 @@ async def moderate_message(message: Message) -> None:
             except Exception:
                 pass
 
-            await add_warning(session, chat.id, user.id, user.id, reason=reason)
+            await add_warning(session, chat.id, user.id, None, reason=reason)
             warn_count = await increment_warnings(session, chat.id, user.id)
             max_warnings = settings.get("max_warnings", 3)
 
-            mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
+            mention = display_name(message.from_user)
 
             if warn_count >= max_warnings:
                 mute_duration = settings.get("mute_duration", 900)
@@ -219,15 +219,69 @@ async def moderate_message(message: Message) -> None:
                     session, chat.id, user.id,
                     "muted", details=f"Auto-mute: {warn_count}/{max_warnings} warnings",
                 )
-                await message.answer(t("mod_muted", lang, user=mention, count=warn_count, reason=reason))
+                await message.answer(t("mod_muted", lang, user=mention, count=warn_count, max=max_warnings, reason=reason))
                 await reset_warnings(session, chat.id, user.id)
             else:
-                await message.answer(t("mod_warned", lang, user=mention, count=warn_count, reason=reason))
+                await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=max_warnings, reason=reason))
 
             await log_action(
                 session, chat.id, user.id,
                 "warned", details=reason,
             )
+
+
+# Media-block handler — makes the admin-panel `filter_media` toggle work:
+# when enabled, ALL media from non-admins is deleted.
+@router.message(IsGroup(), F.photo | F.video | F.animation | F.document, ~F.text.startswith("/"))
+async def moderate_filtered_media(message: Message) -> None:
+    """Delete all media if the chat has `filter_media` enabled."""
+    if message.from_user is None:
+        return
+    try:
+        member = await message.chat.get_member(message.from_user.id)
+        if member.status in ("creator", "administrator"):
+            return
+    except Exception:
+        return
+
+    async with async_session_factory() as session:
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        settings = chat.settings or {}
+        if not settings.get("filter_media", False):
+            return
+
+        user = await get_or_create_user(session, telegram_id=message.from_user.id)
+        lang = await get_user_lang(message)
+
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        mention = display_name(message.from_user)
+        max_warnings = settings.get("max_warnings", 3)
+
+        if not settings.get("moderation_enabled", True):
+            return
+        await add_warning(session, chat.id, user.id, None, reason="Media blocked")
+        warn_count = await increment_warnings(session, chat.id, user.id)
+        if warn_count >= max_warnings:
+            mute_duration = settings.get("mute_duration", 900)
+            await mute_member(session, chat.id, user.id, mute_duration)
+            try:
+                until_date = datetime.datetime.now() + datetime.timedelta(seconds=mute_duration)
+                await message.bot.restrict_chat_member(
+                    chat_id=message.chat.id,
+                    user_id=message.from_user.id,
+                    permissions=ChatPermissions(can_send_messages=False),
+                    until_date=until_date,
+                )
+            except Exception:
+                pass
+            await message.answer(t("mod_muted", lang, user=mention, count=warn_count, max=max_warnings, reason=t("mod_media", lang)))
+            await reset_warnings(session, chat.id, user.id)
+        else:
+            await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=max_warnings, reason=t("mod_media", lang)))
+        await log_action(session, chat.id, user.id, "warned", details="Media blocked")
 
 
 @router.message(IsGroup(), F.photo | F.video | F.animation, ~F.text.startswith("/"))
@@ -267,10 +321,10 @@ async def moderate_nsfw_media(message: Message) -> None:
                         await message.delete()
                     except Exception:
                         pass
-                    await add_warning(session, chat.id, user.id, user.id, reason=f"NSFW caption: {word}")
+                    await add_warning(session, chat.id, user.id, None, reason=f"NSFW caption: {word}")
                     warn_count = await increment_warnings(session, chat.id, user.id)
-                    mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
-                    await message.answer(t("mod_warned", lang, user=mention, count=warn_count, reason=f"NSFW: {word}"))
+                    mention = display_name(message.from_user)
+                    await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=settings.get("max_warnings", 3), reason=f"NSFW: {word}"))
                     return
 
             # Check caption for NSFW domains
@@ -280,10 +334,10 @@ async def moderate_nsfw_media(message: Message) -> None:
                         await message.delete()
                     except Exception:
                         pass
-                    await add_warning(session, chat.id, user.id, user.id, reason=f"NSFW domain: {domain}")
+                    await add_warning(session, chat.id, user.id, None, reason=f"NSFW domain: {domain}")
                     warn_count = await increment_warnings(session, chat.id, user.id)
-                    mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
-                    await message.answer(t("mod_warned", lang, user=mention, count=warn_count, reason=f"NSFW link: {domain}"))
+                    mention = display_name(message.from_user)
+                    await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=settings.get("max_warnings", 3), reason=f"NSFW link: {domain}"))
                     return
 
         # AI image analysis (Gemini Vision)
@@ -293,15 +347,17 @@ async def moderate_nsfw_media(message: Message) -> None:
                 from services.ai_moderation import check_photo_from_telegram
                 ai_result = await check_photo_from_telegram(message.bot, message.photo[-1].file_id, chat_id=message.chat.id)
                 if ai_result and not ai_result.get("allowed", True):
-                    reason = f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
+                    reason = escape_html(
+                        f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
+                    )
                     try:
                         await message.delete()
                     except Exception:
                         pass
-                    await add_warning(session, chat.id, user.id, user.id, reason=reason)
+                    await add_warning(session, chat.id, user.id, None, reason=reason)
                     warn_count = await increment_warnings(session, chat.id, user.id)
                     max_warnings = settings.get("max_warnings", 3)
-                    mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
+                    mention = display_name(message.from_user)
                     if warn_count >= max_warnings:
                         mute_duration = settings.get("mute_duration", 900)
                         await mute_member(session, chat.id, user.id, mute_duration)
@@ -316,10 +372,10 @@ async def moderate_nsfw_media(message: Message) -> None:
                             )
                         except Exception:
                             pass
-                        await message.answer(t("mod_muted", lang, user=mention, count=warn_count, reason=reason))
+                        await message.answer(t("mod_muted", lang, user=mention, count=warn_count, max=max_warnings, reason=reason))
                         await reset_warnings(session, chat.id, user.id)
                     else:
-                        await message.answer(t("mod_warned", lang, user=mention, count=warn_count, reason=reason))
+                        await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=max_warnings, reason=reason))
                     return
             except Exception:
                 pass
@@ -344,16 +400,21 @@ async def moderate_forwarded(message: Message) -> None:
             return
 
         user = await get_or_create_user(session, telegram_id=message.from_user.id)
+        lang = await get_user_lang(message)
 
         try:
             await message.delete()
         except Exception:
             pass
 
-        await add_warning(session, chat.id, user.id, user.id, reason="Forwarded message blocked")
+        await add_warning(session, chat.id, user.id, None, reason="Forwarded message blocked")
         warn_count = await increment_warnings(session, chat.id, user.id)
-        mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
-        await message.answer(f"⚠️ {mention}, пересылка сообщений запрещена. Предупреждение {warn_count}/3")
+        mention = display_name(message.from_user)
+        max_warnings = (chat.settings or {}).get("max_warnings", 3)
+        await message.answer(t(
+            "mod_forward_warned", lang,
+            user=mention, count=warn_count, max=max_warnings,
+        ))
         await log_action(session, chat.id, user.id, "warned", details="Forwarded message blocked")
 
 
@@ -427,13 +488,13 @@ async def moderate_nsfw_sticker(message: Message) -> None:
                 pass
 
             await add_warning(
-                session, chat.id, user.id, user.id,
-                reason=f"NSFW sticker: {sticker_emoji}",
+                session, chat.id, user.id, None,
+                reason=f"NSFW sticker: {escape_html(sticker_emoji)}",
             )
             warn_count = await increment_warnings(session, chat.id, user.id)
             max_warnings = settings.get("max_warnings", 3)
 
-            mention = f"@{message.from_user.username}" if message.from_user.username else f"<b>{message.from_user.first_name}</b>"
+            mention = display_name(message.from_user)
 
             if warn_count >= max_warnings:
                 mute_duration = settings.get("mute_duration", 900)
@@ -453,12 +514,12 @@ async def moderate_nsfw_sticker(message: Message) -> None:
                     "muted", details=f"Auto-mute: {warn_count}/{max_warnings} NSFW stickers",
                 )
                 await message.answer(
-                    t("mod_muted", lang, user=mention, count=warn_count, reason=f"NSFW sticker")
+                    t("mod_muted", lang, user=mention, count=warn_count, max=max_warnings, reason=f"NSFW sticker")
                 )
                 await reset_warnings(session, chat.id, user.id)
             else:
                 await message.answer(
-                    t("mod_warned", lang, user=mention, count=warn_count, reason=f"NSFW sticker")
+                    t("mod_warned", lang, user=mention, count=warn_count, max=max_warnings, reason=f"NSFW sticker")
                 )
 
             await log_action(

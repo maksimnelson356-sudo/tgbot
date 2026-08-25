@@ -5,6 +5,7 @@ from db.base import async_session_factory
 from db.queries import get_or_create_chat, log_action
 from filters.chat_type import IsGroup, HasPendingCaptcha
 from services.captcha import create_challenge, verify, has_pending, _pending
+from utils.helpers import escape_html
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -22,10 +23,10 @@ FULL_PERMISSIONS = ChatPermissions(
     can_send_polls=True,
     can_send_other_messages=True,
     can_add_web_page_previews=True,
-    can_invite_users=True,
-    can_change_info=True,
-    can_pin_messages=True,
-    can_manage_topics=True,
+    can_change_info=False,
+    can_invite_users=False,
+    can_pin_messages=False,
+    can_manage_topics=False,
 )
 
 
@@ -92,7 +93,7 @@ async def on_captcha_answer(message: Message) -> None:
             chat_db = await get_or_create_chat(session, telegram_id=chat_id)
             await log_action(session, chat_id, user_id, "captcha_passed")
 
-        name = message.from_user.first_name or message.from_user.username or str(user_id)
+        name = escape_html(message.from_user.first_name or message.from_user.username or str(user_id))
         await message.answer(t("captcha_passed", lang, name=name))
 
     elif result is False:
@@ -102,9 +103,10 @@ async def on_captcha_answer(message: Message) -> None:
             pass
 
         info = _pending.get((chat_id, user_id))
-        name = message.from_user.first_name or "?"
+        name = escape_html(message.from_user.first_name or "?")
+        max_attempts = 3
 
-        if info is None or info.get("attempts", 0) >= 3:
+        if info is None or info.get("attempts", 0) >= max_attempts:
             await message.answer(t("captcha_too_many", lang, name=name))
             try:
                 await message.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
@@ -112,7 +114,7 @@ async def on_captcha_answer(message: Message) -> None:
             except Exception:
                 pass
         else:
-            remaining = 3 - info.get("attempts", 0)
+            remaining = max_attempts - info.get("attempts", 0)
             await message.answer(t("captcha_wrong", lang, name=name, attempts=remaining))
 
     else:

@@ -9,6 +9,7 @@ from aiogram.types import Message
 from db.base import async_session_factory
 from db.models import MessageLog
 from filters.chat_type import IsGroup
+from utils.helpers import escape_html, keep_next
 
 router = Router()
 router.name = "stats_daily"
@@ -45,9 +46,10 @@ async def cmd_daystats(message: Message) -> None:
         from db.queries import get_or_create_user
         async with async_session_factory() as s:
             user = await get_or_create_user(s, telegram_id=user_id)
-        name = user.first_name or f"User {user_id}"
+        name = escape_html(user.first_name or f"User {user_id}")
         lines.append(f"  {name}: {count} msgs")
 
+    keep_next(message)
     await message.answer("\n".join(lines))
 
 
@@ -84,9 +86,10 @@ async def cmd_topact(message: Message) -> None:
         from db.queries import get_or_create_user
         async with async_session_factory() as s:
             user = await get_or_create_user(s, telegram_id=user_id)
-        name = user.first_name or f"User {user_id}"
+        name = escape_html(user.first_name or f"User {user_id}")
         emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else "▫️"
         pct = int(count / total * 100) if total else 0
         lines.append(f"{emoji} {name} — {count} ({pct}%)")
 
+    keep_next(message)
     await message.answer("\n".join(lines))

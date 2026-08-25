@@ -1,81 +1,105 @@
 #!/usr/bin/env python3
 """
-webhook_server.py — Простой вебхук-сервер для GitHub.
+webhook_server.py — Вебхук-сервер для GitHub auto-deploy.
 Слушает POST-запросы от GitHub и вызывает deploy.sh.
 
-Запуск: python3 webhook_server.py
-Порт: 9000 (настройте в GitHub webhook)
+Требования безопасности:
+- WEBHOOK_SECRET обязателен (сервер не стартует без него).
+- По умолчанию слушает только 127.0.0.1.
+  Для доступа снаружи используйте reverse-proxy с TLS (nginx/caddy)
+  либо задайте WEBHOOK_BIND=0.0.0.0 и ограничьте порт файрволом.
 """
 
 import hashlib
 import hmac
 import os
 import subprocess
-import json
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import sys
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-# Настройки
-PORT = 9000
-SECRET = os.environ.get("WEBHOOK_SECRET", "my_secret_token_change_me")
+
+def _load_env_file(path: str) -> None:
+    """Minimal .env loader so cron/@reboot starts work without systemd env."""
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
+
+# Load secrets from the repo's .env unless already present in the environment
+_load_env_file(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
+
+PORT = int(os.environ.get("WEBHOOK_PORT", "9000"))
+BIND_HOST = os.environ.get("WEBHOOK_BIND", "127.0.0.1")
+SECRET = os.environ.get("WEBHOOK_SECRET") or ""
 DEPLOY_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deploy.sh")
+
+if not SECRET:
+    sys.exit("FATAL: WEBHOOK_SECRET is not set. Refusing to start.")
+if len(SECRET) < 32:
+    sys.exit("FATAL: WEBHOOK_SECRET is too short (min 32 chars). Generate: openssl rand -hex 32")
+
+MAX_BODY = 25 * 1024 * 1024  # GitHub payload limit
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         content_length = int(self.headers.get("Content-Length", 0))
+        if content_length > MAX_BODY:
+            self._reply(413, b"Payload too large")
+            return
         body = self.rfile.read(content_length)
 
-        # Проверяем подпись GitHub
+        # Проверяем подпись GitHub (HMAC-SHA256)
         signature = self.headers.get("X-Hub-Signature-256", "")
-        if SECRET:
-            expected = "sha256=" + hmac.new(
-                SECRET.encode(), body, hashlib.sha256
-            ).hexdigest()
-            if not hmac.compare_digest(signature, expected):
-                self.send_response(403)
-                self.end_headers()
-                self.wfile.write(b"Invalid signature")
-                return
+        expected = "sha256=" + hmac.new(SECRET.encode(), body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            self._reply(403, b"Invalid signature")
+            return
 
-        # Проверяем что это push event
         event = self.headers.get("X-GitHub-Event", "")
         if event == "ping":
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"Pong")
+            self._reply(200, b"Pong")
             return
-
         if event != "push":
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"Ignored event")
+            self._reply(200, b"Ignored event")
             return
 
-        # Запускаем деплой
+        # Запускаем деплой. Наружу отдаём только статус,
+        # полный вывод уходит в journald/stderr этого сервиса.
         try:
             result = subprocess.run(
                 ["bash", DEPLOY_SCRIPT],
                 capture_output=True, text=True, timeout=120,
             )
-            output = result.stdout + result.stderr
+            print(f"[deploy] rc={result.returncode}\n{result.stdout}{result.stderr}", flush=True)
             status = 200 if result.returncode == 0 else 500
+            self._reply(status, b"Deployed" if status == 200 else b"Deploy failed")
         except Exception as e:
-            output = str(e)
-            status = 500
+            print(f"[deploy] error: {e}", flush=True)
+            self._reply(500, b"Deploy error")
 
-        self.send_response(status)
+    def _reply(self, code: int, payload: bytes) -> None:
+        self.send_response(code)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
-        self.wfile.write(output.encode())
+        self.wfile.write(payload)
 
     def log_message(self, format, *args):
-        print(f"[{self.log_date_time_string()}] {format % args}")
+        print(f"[{self.log_date_time_string()}] {format % args}", flush=True)
 
 
 def main():
-    server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
-    print(f"Webhook server listening on port {PORT}")
+    server = ThreadingHTTPServer((BIND_HOST, PORT), WebhookHandler)
+    print(f"Webhook server listening on {BIND_HOST}:{PORT}")
     print(f"Deploy script: {DEPLOY_SCRIPT}")
-    print(f"Secret: {'***' if SECRET else 'NONE (open)'}")
+    print(f"Secret: *** ({len(SECRET)} chars)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

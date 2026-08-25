@@ -12,6 +12,7 @@ from db.queries import list_chat_admins, remove_chat_admin, update_chat_settings
 from db.queries import get_or_create_user, is_chat_admin_db
 from filters.admin import HasRank
 from filters.chat_type import IsGroup, IsReplyTo
+from utils.helpers import display_name, escape_html, keep_next
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -209,7 +210,7 @@ async def cmd_addadmin(message: Message) -> None:
         target = await get_or_create_user(session, telegram_id=target_user.id)
         await add_chat_admin(session, chat.id, target.id, admin_user.id, rank=rank)
 
-    name = target_user.first_name or str(target_user.id)
+    name = escape_html(target_user.first_name or str(target_user.id))
     rank_label = f"{_RANK_EMOJI[rank]} {_RANK_NAMES[rank]}"
     await message.answer(f"✅ <b>{name}</b> назначен — {rank_label}")
 
@@ -239,15 +240,15 @@ async def cmd_removeadmin(message: Message) -> None:
         await message.answer("❌ Этот пользователь не администратор бота.")
         return
 
-    name = target_user.first_name or str(target_user.id)
+    name = escape_html(target_user.first_name or str(target_user.id))
     await message.answer(f"✅ <b>{name}</b> понижен — больше не администратор.")
 
 
 # ── /adminlist — Show bot admins ──────────────────────────────────────────────
 
-@router.message(Command("adminlist"), IsGroup())
+@router.message(Command("adminlist"), IsGroup(), HasRank(1))
 async def cmd_adminlist(message: Message) -> None:
-    """Show all bot-level admins with ranks."""
+    """Show all bot-level admins with ranks (bot admins only)."""
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         admins = await list_chat_admins(session, chat.id)
@@ -258,9 +259,10 @@ async def cmd_adminlist(message: Message) -> None:
 
     lines = ["📋 <b>Администраторы бота:</b>"]
     for user, rank in admins:
-        name = f"@{user.username}" if user.username else f"<b>{user.first_name or 'Unknown'}</b>"
+        name = display_name(user, default="Unknown")
         rank_label = f"{_RANK_EMOJI.get(rank, '❓')} {_RANK_NAMES.get(rank, 'Неизвестно')}"
         lines.append(f"• {name} — {rank_label}")
+    keep_next(message)
     await message.answer("\n".join(lines))
 
 
@@ -282,7 +284,7 @@ async def text_addadmin(message: Message) -> None:
         new_rank = min(current_rank + 1, 3)
         await add_chat_admin(session, chat.id, target_user.id, admin_user.id, rank=new_rank)
 
-    name = target.first_name or str(target.id)
+    name = escape_html(target.first_name or str(target.id))
     rank_label = f"{_RANK_EMOJI[new_rank]} {_RANK_NAMES[new_rank]}"
     await message.answer(f"✅ <b>{name}</b> назначен — {rank_label}")
 
@@ -299,7 +301,7 @@ async def text_removeadmin(message: Message) -> None:
         target_user = await get_or_create_user(session, telegram_id=target.id)
         removed = await remove_chat_admin(session, chat.id, target_user.id)
 
-    name = target.first_name or str(target.id)
+    name = escape_html(target.first_name or str(target.id))
     if removed:
         await message.answer(f"✅ <b>{name}</b> понижен — больше не администратор.")
     else:
@@ -386,7 +388,7 @@ async def cmd_panel_dm(message: Message) -> None:
         buttons.append([
             InlineKeyboardButton(
                 text=f"⚙️ {title}",
-                web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={chat.telegram_id}&{params}"),
+                web_app=WebAppInfo(url=f"{PANEL_URL}?chat_id={chat_item.telegram_id}&{params}"),
             )
         ])
 

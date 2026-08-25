@@ -5,6 +5,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from services.external_api import get_random_fact, get_random_joke
+from utils.helpers import escape_html
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -107,9 +108,9 @@ _HUG_GIF = "https://i.pinimg.com/originals/7b/73/4e/7b734ed8ced0bb4bd7964bb7f733
 def _user_name(user) -> str:
     """Return display name for a user — prefer first_name."""
     if user.first_name:
-        return f"<b>{user.first_name}</b>"
+        return f"<b>{escape_html(user.first_name)}</b>"
     if user.username:
-        return f"@{user.username}"
+        return f"@{escape_html(user.username)}"
     return "Unknown"
 
 
@@ -131,7 +132,7 @@ async def cmd_hug(message: Message) -> None:
             if part.startswith("@"):
                 username = part[1:].lower()
                 if not target:
-                    text = f"🤗 <b>Обнимашки для @{username}!</b>" if lang == "ru" else f"🤗 <b>Hug for @{username}!</b>"
+                    text = f"🤗 <b>Обнимашки для @{escape_html(username)}!</b>" if lang == "ru" else f"🤗 <b>Hug for @{escape_html(username)}!</b>"
                     await message.answer_animation(animation=hug_gif, caption=text)
                     return
 

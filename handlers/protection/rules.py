@@ -6,6 +6,7 @@ from db.base import async_session_factory
 from db.queries import get_or_create_chat, update_chat_settings
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
+from utils.helpers import keep_next
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -25,6 +26,7 @@ async def cmd_rules(message: Message) -> None:
         await message.answer("📜 No rules set. Admins can use /setrules <text>")
         return
 
+    keep_next(message)
     await message.answer(f"📜 <b>Rules</b>\n\n{rules}")
 
 

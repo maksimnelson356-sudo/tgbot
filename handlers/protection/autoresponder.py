@@ -9,6 +9,7 @@ from db.base import async_session_factory
 from db.queries import get_or_create_chat, update_chat_settings
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
+from utils.helpers import escape_html
 
 router = Router()
 router.name = "autoresponder"
@@ -61,7 +62,7 @@ async def cmd_addreply(message: Message) -> None:
         replies[kw] = reply
         await update_chat_settings(session, chat.id, {SAVE_KEY: replies})
 
-    await message.answer(f"✅ Auto-reply added: '{kw}' → '{reply}'")
+    await message.answer(f"✅ Auto-reply added: '{escape_html(kw)}' → '{escape_html(reply)}'")
 
 
 @router.message(Command("delreply"), IsGroup(), HasRank(2))
@@ -78,9 +79,9 @@ async def cmd_delreply(message: Message) -> None:
         if kw in replies:
             del replies[kw]
             await update_chat_settings(session, chat.id, {SAVE_KEY: replies})
-            await message.answer(f"✅ Deleted reply for '{kw}'")
+            await message.answer(f"✅ Deleted reply for '{escape_html(kw)}'")
         else:
-            await message.answer(f"❌ No reply for '{kw}'")
+            await message.answer(f"❌ No reply for '{escape_html(kw)}'")
 
 
 @router.message(Command("listreplies"), IsGroup(), HasRank(2))
@@ -94,7 +95,7 @@ async def cmd_listreplies(message: Message) -> None:
         return
     lines = ["📝 <b>Auto-replies:</b>"]
     for kw, reply in replies.items():
-        lines.append(f"• <b>{kw}</b> → {reply[:30]}...")
+        lines.append(f"• <b>{escape_html(kw)}</b> → {escape_html(reply[:30])}...")
     await message.answer("\n".join(lines))
 
 

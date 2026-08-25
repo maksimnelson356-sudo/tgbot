@@ -11,6 +11,9 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
+# Hard cap for track downloads buffered in RAM (20 MB)
+MAX_TRACK_BYTES = 20 * 1024 * 1024
+
 HITMO_MIRRORS = [
     "https://rus.hitmotop.com",
     "https://hitmoz.org",
@@ -123,8 +126,17 @@ async def download_track(track: MusicTrack) -> Optional[io.BytesIO]:
                     logger.warning("Download failed: %d (url: %s)", resp.status, track.download_url)
                     return None
 
+                # Refuse oversized downloads before buffering them into RAM
+                content_length = int(resp.headers.get("Content-Length") or 0)
+                if content_length > MAX_TRACK_BYTES:
+                    logger.warning("Track too large (%d bytes), refusing", content_length)
+                    return None
+
                 content_type = resp.headers.get("Content-Type", "")
-                data = await resp.read()
+                data = await resp.content.read(MAX_TRACK_BYTES + 1)
+                if len(data) > MAX_TRACK_BYTES:
+                    logger.warning("Track exceeded size cap while reading")
+                    return None
                 if len(data) < 10000:
                     logger.warning("Downloaded file too small: %d bytes", len(data))
                     return None
@@ -136,8 +148,9 @@ async def download_track(track: MusicTrack) -> Optional[io.BytesIO]:
                     playlist_text = data.decode("utf-8", errors="ignore")
                     m3u_match = re.search(r"(https?://\S+\.(?:mp3|m4a|ogg))", playlist_text)
                     if m3u_match:
-                        async with session.get(m3u_match.group(1)) as resp2:
-                            if resp2.status == 200:
+                        async with session.get(m3u_match.group(1), timeout=aiohttp.ClientTimeout(total=30)) as resp2:
+                            length2 = int(resp2.headers.get("Content-Length") or 0)
+                            if resp2.status == 200 and 0 < length2 <= MAX_TRACK_BYTES:
                                 data = await resp2.read()
 
                 buf = io.BytesIO(data)

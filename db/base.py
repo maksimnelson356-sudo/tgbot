@@ -1,5 +1,6 @@
 import os
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -17,6 +18,16 @@ engine = create_async_engine(
     echo=False,
     connect_args={"timeout": 30},
 )
+
+
+@event.listens_for(engine.sync_engine, "connect")
+def _set_sqlite_pragmas(dbapi_connection, _record) -> None:
+    """SQLite pragmas on every new connection."""
+    if settings.DATABASE_URL.startswith("sqlite"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.close()
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -40,17 +51,41 @@ async def init_db() -> None:
         Reputation,
         ScheduledPost,
         User,
-        User,
         Warning,
     )
 
     async with engine.begin() as conn:
-        # Enable WAL mode for better concurrent read/write
-        if settings.DATABASE_URL.startswith("sqlite"):
-            await conn.execute(
-                __import__("sqlalchemy").text("PRAGMA journal_mode=WAL")
-            )
         await conn.run_sync(Base.metadata.create_all)
+        if settings.DATABASE_URL.startswith("sqlite"):
+            await _migrate_sqlite(conn)
+
+
+_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
+    # table -> [(column, DDL fragment)]
+    "chat_members": [
+        ("xp", "INTEGER NOT NULL DEFAULT 0"),
+        ("daily_streak", "INTEGER NOT NULL DEFAULT 0"),
+        ("last_daily_at", "DATETIME NULL"),
+        ("invited_by", "INTEGER NULL"),
+    ],
+    "users": [
+        ("referred_by", "INTEGER NULL"),
+    ],
+}
+
+
+async def _migrate_sqlite(conn) -> None:
+    """Add columns that create_all can't add to existing tables."""
+    from sqlalchemy import text
+
+    for table, columns in _MIGRATIONS.items():
+        result = await conn.execute(text(f"PRAGMA table_info({table})"))
+        existing = {row[1] for row in result.fetchall()}
+        for col_name, col_ddl in columns:
+            if col_name not in existing:
+                await conn.execute(
+                    text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_ddl}")
+                )
 
 
 async def get_session() -> AsyncSession:
