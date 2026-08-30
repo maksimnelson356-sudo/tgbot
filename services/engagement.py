@@ -8,6 +8,7 @@ import logging
 from db.base import async_session_factory
 from db.models import Chat, User
 from sqlalchemy import select
+from utils.time_utils import today_local
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def _mention(name_html: str, username: str, telegram_id: int) -> str:
 async def check_birthdays(bot) -> None:
     """Once a day: congratulate members whose birthday is today."""
     global _last_birthday_date
-    today = datetime.date.today()
+    today = today_local()
     if _last_birthday_date == today:
         return
     _last_birthday_date = today
@@ -78,7 +79,7 @@ async def check_birthdays(bot) -> None:
 async def weekly_digest(bot) -> None:
     """Mondays: post a digest with activity/reputation/xp tops."""
     global _last_digest_date
-    today = datetime.date.today()
+    today = today_local()
     if today.weekday() != 0 or _last_digest_date == today:
         return
     _last_digest_date = today

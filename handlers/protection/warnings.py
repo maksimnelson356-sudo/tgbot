@@ -100,7 +100,21 @@ async def _do_warn(message: Message, reason: str = "No reason provided") -> None
 
         max_warnings = (chat.settings or {}).get("max_warnings", 3)
         if warn_count >= max_warnings:
-            await mute_member(session, chat.id, user.id, 3600)
+            mute_duration = (chat.settings or {}).get("mute_duration", 3600)
+            await mute_member(session, chat.id, user.id, mute_duration)
+            # Real Telegram restriction — the DB flag alone does not stop
+            # the user from typing; without this the mute is "virtual".
+            try:
+                until_date = datetime.datetime.now() + datetime.timedelta(seconds=mute_duration)
+                await message.bot.restrict_chat_member(
+                    chat_id=message.chat.id,
+                    user_id=target.id,
+                    permissions=ChatPermissions(can_send_messages=False),
+                    until_date=until_date,
+                )
+            except Exception as e:
+                await message.answer(f"⚠️ Cannot restrict: {e}. Make bot admin!")
+                return
             await message.answer(t("warn_auto_muted", lang, user=mention))
 
 
@@ -271,7 +285,7 @@ async def cmd_list_warnings(message: Message) -> None:
 
     lines = [t("warnings_title", lang, user=get_user_mention(target))]
     for i, w in enumerate(warnings, 1):
-        lines.append(f"{i}. {w.reason or 'No reason'} ({w.created_at.strftime('%Y-%m-%d %H:%M')})")
+        lines.append(f"{i}. {escape_html(w.reason or 'No reason')} ({w.created_at.strftime('%Y-%m-%d %H:%M')})")
 
     keep_next(message)
     await message.answer("\n".join(lines))

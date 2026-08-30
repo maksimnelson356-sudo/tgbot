@@ -2,8 +2,8 @@
 # deploy.sh — скрипт обновления бота (вызывается вебхуком при пуше).
 # Работает от непривилегированного пользователя-владельца /opt/tgbot БЕЗ sudo.
 #
-# Рестарт: процесс бота запущен под systemd-юнитом tgbot (Restart=always),
-# поэтому просто завершаем его — systemd сам поднимет свежий код через 10с.
+# Рестарт: убиваем процесс через pkill, затем явно рестартуем юнит
+# через systemctl (sudo-правило позволяет это без пароля).
 
 BOT_DIR="/opt/tgbot"
 LOG_FILE="$BOT_DIR/deploy/deploy.log"
@@ -35,9 +35,10 @@ if git diff "$OLD_COMMIT" "$NEW_COMMIT" --name-only | grep -q "requirements.txt"
     pip install -r requirements.txt -q >> "$LOG_FILE" 2>&1
 fi
 
-# Рестарт без sudo: убиваем процесс — systemd перезапустит юнит tgbot
-pkill -f '/opt/tgbot/bot\.py' && {
-    echo "Bot process terminated; systemd will restart it with new code." >> "$LOG_FILE"
-} || echo "WARNING: bot process not found (not running?)" >> "$LOG_FILE"
+# Рестарт: убиваем процесс, затем явно рестартуем юнит через sudo
+pkill -f '/opt/tgbot/bot\.py' 2>/dev/null || true
+sleep 1
+sudo systemctl restart tgbot
+echo "Bot restarted via systemctl." >> "$LOG_FILE"
 
 echo "=== Deploy finished: $(date) ===" >> "$LOG_FILE"

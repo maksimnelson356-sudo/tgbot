@@ -1,4 +1,5 @@
 import random
+import time
 
 from aiogram import Router
 from aiogram.filters import Command
@@ -13,6 +14,23 @@ router = Router()
 router.name = "games"
 
 _games: dict[str, dict] = {}
+
+# Abandoned guess/trivia sessions are dropped after this TTL.
+_GAME_TTL = 3600  # seconds
+
+
+def _prune_games() -> None:
+    """Remove stale game sessions so the dict stays bounded."""
+    if len(_games) < 500:
+        return
+    cutoff = time.monotonic() - _GAME_TTL
+    stale = [k for k, g in _games.items() if g.get("_created", 0) < cutoff]
+    for k in stale:
+        _games.pop(k, None)
+
+
+def _start_game(key: str, state: dict) -> None:
+    _games[key] = {**state, "_created": time.monotonic()}
 
 _TRIVIA_QUESTIONS = [
     {"q": "What is the capital of France?", "options": ["London", "Paris", "Berlin", "Madrid"], "answer": 1},
@@ -132,7 +150,8 @@ async def cmd_guess(message: Message) -> None:
 
     if not text:
         number = random.randint(1, 10)
-        _games[game_key] = {"number": number, "attempts": 0}
+        _prune_games()
+        _start_game(game_key, {"number": number, "attempts": 0})
         await message.answer(t("guess_title", lang))
         return
 
@@ -145,7 +164,8 @@ async def cmd_guess(message: Message) -> None:
 
     if game is None:
         number = random.randint(1, 10)
-        _games[game_key] = {"number": number, "attempts": 0}
+        _prune_games()
+        _start_game(game_key, {"number": number, "attempts": 0})
         game = _games[game_key]
 
     game["attempts"] += 1
@@ -176,7 +196,8 @@ async def cmd_trivia(message: Message) -> None:
     if not text:
         questions = _TRIVIA_QUESTIONS_RU if lang == "ru" else _TRIVIA_QUESTIONS
         q = random.choice(questions)
-        _games[game_key] = {"correct": q["answer"], "options": q["options"]}
+        _prune_games()
+        _start_game(game_key, {"correct": q["answer"], "options": q["options"]})
 
         options_text = "\n".join(f"  {i + 1}. {opt}" for i, opt in enumerate(q["options"]))
         await message.answer(f"🧠 <b>Trivia!</b>\n\n{q['q']}\n\n{options_text}\n\n💡 /trivia <1-{len(q['options'])}>")

@@ -8,11 +8,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from db.base import async_session_factory
 from db.queries import add_chat_admin, get_or_create_chat, get_chat_admin_rank
-from db.queries import list_chat_admins, remove_chat_admin, update_chat_settings
+from db.queries import list_chat_admins, remove_chat_admin, set_chat_setting
 from db.queries import get_or_create_user, is_chat_admin_db
 from filters.admin import HasRank
 from filters.chat_type import IsGroup, IsReplyTo
-from utils.helpers import display_name, escape_html, keep_next
+from utils.helpers import display_name, escape_html, keep_next, spawn
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -89,7 +89,7 @@ async def cmd_admin(message: Message) -> None:
             await panel_msg.delete()
         except Exception:
             pass
-    asyncio.create_task(_delete_later())
+    spawn(_delete_later(), name="admin_panel_hide")
 
 
 @router.callback_query(F.data.startswith("admin:"))
@@ -131,7 +131,7 @@ async def admin_callback(callback: CallbackQuery) -> None:
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=callback.message.chat.id)
         current = chat.settings.get(setting_key, True)
-        await update_chat_settings(session, chat.id, {setting_key: not current})
+        await set_chat_setting(session, chat.id, setting_key, not current)
 
     await callback.answer(f"Toggled {'ON' if not current else 'OFF'}")
 
@@ -311,9 +311,10 @@ async def text_removeadmin(message: Message) -> None:
 @router.message(
     F.text.in_({"Кто админ", "кто админ", "КТО АДМИН", "Кто админы", "кто админы", "Админы", "админы"}),
     IsGroup(),
+    HasRank(1),
 )
 async def text_wloadmins(message: Message) -> None:
-    """Show admin list by text command."""
+    """Show admin list by text command (bot admins rank 1+ or Telegram admins)."""
     await cmd_adminlist(message)
 
 

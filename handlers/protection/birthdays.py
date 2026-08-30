@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from db.base import async_session_factory
-from db.queries import get_or_create_chat, get_or_create_user, update_chat_settings
+from db.queries import get_or_create_chat, get_or_create_user, set_chat_setting
 from filters.chat_type import IsGroup
 from utils.helpers import escape_html
 
@@ -34,7 +34,7 @@ async def cmd_setbday(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         bdays = (chat.settings or {}).get(SAVE_KEY, {})
         bdays[str(message.from_user.id)] = f"{int(day):02d}.{int(month):02d}"
-        await update_chat_settings(session, chat.id, {SAVE_KEY: bdays})
+        await set_chat_setting(session, chat.id, SAVE_KEY, bdays)
 
     await message.answer(f"✅ Birthday set to {int(day):02d}.{int(month):02d}")
 

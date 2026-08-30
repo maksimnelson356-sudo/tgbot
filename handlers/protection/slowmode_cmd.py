@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from db.base import async_session_factory
-from db.queries import get_or_create_chat, update_chat_settings
+from db.queries import get_or_create_chat, set_chat_setting
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
 
@@ -33,7 +33,7 @@ async def cmd_slowmode(message: Message) -> None:
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
-        await update_chat_settings(session, chat.id, {"slowmode_delay": delay})
+        await set_chat_setting(session, chat.id, "slowmode_delay", delay)
 
     if delay > 0:
         await message.answer(f"🐌 Slow mode set to {delay}s between messages.")

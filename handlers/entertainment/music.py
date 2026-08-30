@@ -17,7 +17,7 @@ from aiogram.types import (
 )
 
 from services.music_service import search, download_track
-from utils.helpers import escape_html
+from utils.helpers import escape_html, spawn
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -48,6 +48,11 @@ def _cache_key(query: str) -> str:
 
 def _put_cache(query: str, tracks: list, user_id: int) -> str:
     key = _cache_key(query)
+    if len(_cache) >= 100:  # sweep expired entries to keep the cache bounded
+        now = time.time()
+        stale = [k for k, (ts, *_rest) in _cache.items() if now - ts >= CACHE_TTL]
+        for k in stale:
+            _cache.pop(k, None)
     _cache[key] = (time.time(), query, tracks, user_id)
     return key
 
@@ -188,9 +193,9 @@ async def cmd_music(message: Message, state: FSMContext) -> None:
         return
 
     prompt = await message.answer(t("music_ask_query", lang))
-    # Delete the prompt after 30s in groups
+    # Delete the prompt after 30s in groups (tracked — survives GC)
     if message.chat.type in ("group", "supergroup"):
-        asyncio.create_task(_delete_later(prompt, 30.0))
+        spawn(_delete_later(prompt, 30.0), name="music_prompt_del")
     await state.set_state(MusicState.waiting_query)
 
 

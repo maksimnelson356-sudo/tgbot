@@ -3,10 +3,10 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from db.base import async_session_factory
-from db.queries import get_or_create_chat, update_chat_settings
+from db.queries import get_or_create_chat, set_chat_setting
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
-from utils.helpers import keep_next
+from utils.helpers import escape_html, keep_next
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
@@ -27,7 +27,7 @@ async def cmd_rules(message: Message) -> None:
         return
 
     keep_next(message)
-    await message.answer(f"📜 <b>Rules</b>\n\n{rules}")
+    await message.answer(f"📜 <b>Rules</b>\n\n{escape_html(rules)}")
 
 
 @router.message(Command("setrules"), IsGroup(), HasRank(2))
@@ -40,7 +40,7 @@ async def cmd_setrules(message: Message) -> None:
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
-        await update_chat_settings(session, chat.id, {"rules": text})
+        await set_chat_setting(session, chat.id, "rules", text)
 
     await message.answer("✅ Rules updated!")
 
@@ -50,6 +50,6 @@ async def cmd_delrules(message: Message) -> None:
     """Delete chat rules."""
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
-        await update_chat_settings(session, chat.id, {"rules": ""})
+        await set_chat_setting(session, chat.id, "rules", "")
 
     await message.answer("✅ Rules deleted.")

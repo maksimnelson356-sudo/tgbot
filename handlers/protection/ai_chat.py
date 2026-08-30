@@ -18,6 +18,16 @@ logger = logging.getLogger(__name__)
 # Rate limit: max 1 AI reply per 5 seconds per chat
 _chat_cooldowns: dict[int, float] = {}
 _AI_COOLDOWN: float = 5.0
+_MAX_CHATS_TRACKED = 1000
+
+
+def _prune_cooldowns(now: float) -> None:
+    """Drop stale per-chat cooldowns once the dict grows large."""
+    if len(_chat_cooldowns) <= _MAX_CHATS_TRACKED:
+        return
+    stale = [cid for cid, ts in _chat_cooldowns.items() if now - ts >= _AI_COOLDOWN]
+    for cid in stale:
+        _chat_cooldowns.pop(cid, None)
 
 
 @router.message(IsGroup(), IsReplyToBot(), F.text, ~F.text.startswith("/"))
@@ -33,6 +43,7 @@ async def ai_chat_reply(message: Message) -> None:
     last = _chat_cooldowns.get(message.chat.id, 0)
     if now - last < _AI_COOLDOWN:
         return
+    _prune_cooldowns(now)
     _chat_cooldowns[message.chat.id] = now
 
     async with async_session_factory() as session:

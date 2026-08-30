@@ -14,6 +14,7 @@ from db.queries import (
     update_post_last_sent,
 )
 from utils.helpers import escape_html, spawn
+from utils.time_utils import today_local
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ _last_retention_date: Optional[datetime.date] = None
 async def _run_message_log_retention() -> None:
     """Once a day, purge message_log rows older than the retention window."""
     global _last_retention_date
-    today = datetime.date.today()
+    today = today_local()
     if _last_retention_date == today:
         return
     try:

@@ -9,6 +9,8 @@ from utils.helpers import escape_html
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
 
+from config import settings as bot_settings
+
 router = Router()
 router.name = "captcha_handler"
 
@@ -104,7 +106,7 @@ async def on_captcha_answer(message: Message) -> None:
 
         info = _pending.get((chat_id, user_id))
         name = escape_html(message.from_user.first_name or "?")
-        max_attempts = 3
+        max_attempts = bot_settings.CAPTCHA_MAX_ATTEMPTS
 
         if info is None or info.get("attempts", 0) >= max_attempts:
             await message.answer(t("captcha_too_many", lang, name=name))

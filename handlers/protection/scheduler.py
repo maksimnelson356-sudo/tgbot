@@ -128,6 +128,10 @@ async def on_schedule_interval(message: Message, state: FSMContext) -> None:
     )
 
 
+# Media-type → emoji legend for the scheduled-post list
+_MEDIA_EMOJI = {"photo": "📷", "video": "🎬", "animation": "🎞", "document": "📄", "voice": "🎤", "audio": "🎵", "video_note": "🎞️"}
+
+
 @router.message(Command("schedule_list"), IsGroup(), HasRank(2))
 async def cmd_schedule_list(message: Message) -> None:
     """List active scheduled posts."""
@@ -142,8 +146,7 @@ async def cmd_schedule_list(message: Message) -> None:
 
     lines = [t("schedule_list_title", lang)]
     for p in posts:
-        _media_emoji = {"photo": "📷", "video": "🎬", "animation": "🎞", "document": "📄", "voice": "🎤", "audio": "🎵", "video_note": " circle "}
-        media = _media_emoji.get(p.media_type or "", "📎" if p.photo_file_id else "📝")
+        media = _MEDIA_EMOJI.get(p.media_type or "", "📎" if p.photo_file_id else "📝")
         lines.append(f"• #{p.id} {media} {(p.text or '—')[:50]} (каждые {p.interval_hours}ч)")
     await message.answer("\n".join(lines))
 

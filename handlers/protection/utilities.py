@@ -8,7 +8,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, ChatPermissions
 
 from db.base import async_session_factory
-from db.queries import add_note, get_or_create_chat, update_chat_settings
+from db.queries import add_note, get_or_create_chat, set_chat_setting
 from db.queries import get_or_create_user
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
@@ -166,7 +166,7 @@ async def cmd_allowlink(message: Message) -> None:
         allowed = settings.get("allowed_domains", [])
         if domain not in allowed:
             allowed.append(domain)
-            await update_chat_settings(session, chat.id, {"allowed_domains": allowed})
+            await set_chat_setting(session, chat.id, "allowed_domains", allowed)
         await message.answer(f"✅ Domain <b>{escape_html(domain)}</b> whitelisted!")
 
 

@@ -15,6 +15,15 @@ class SlowModeMiddleware(BaseMiddleware):
         self.history: dict[tuple[int, int], float] = {}
         super().__init__()
 
+    def _prune_history(self, now: float) -> None:
+        """Drop entries idle longer than 10 minutes, keeping the dict bounded."""
+        if len(self.history) < 1000:
+            return
+        cutoff = now - 600
+        stale = [k for k, ts in self.history.items() if ts < cutoff]
+        for k in stale:
+            self.history.pop(k, None)
+
     async def __call__(self, handler, event: Message, data: dict):
         if event.from_user is None or event.chat is None:
             return await handler(event, data)
@@ -46,5 +55,6 @@ class SlowModeMiddleware(BaseMiddleware):
                 pass
             return  # Drop message
 
+        self._prune_history(now)
         self.history[key] = now
         return await handler(event, data)

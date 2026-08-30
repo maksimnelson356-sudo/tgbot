@@ -97,6 +97,34 @@ _NSFW_DOMAINS = [
 ]
 
 
+def _extract_domains(text: str) -> set[str]:
+    """Extract lowercase hostnames from any URLs inside the text."""
+    from urllib.parse import urlparse
+
+    domains: set[str] = set()
+    for url in _URL_RE.findall(text):
+        url = url.rstrip(".,;!?)")  # strip trailing punctuation
+        if "://" not in url:
+            url = f"https://{url}"
+        try:
+            host = urlparse(url).hostname or ""
+        except ValueError:
+            continue
+        if host:
+            domains.add(host.lower())
+    return domains
+
+
+def _domain_is_allowed(host: str, allowed_domains: list) -> bool:
+    """Match a hostname against the admin-configured whitelist.
+
+    Exact matches and subdomains pass: allowing ``example.com`` also
+    lets ``sub.example.com`` through.
+    """
+    allowed = {d.lower().lstrip(".") for d in (allowed_domains or []) if d}
+    return any(host == d or host.endswith("." + d) for d in allowed)
+
+
 @router.message(IsGroup(), F.text, ~F.text.startswith("/"))
 async def moderate_message(message: Message) -> None:
     """Check messages for spam, bad words, links, and NSFW content."""
@@ -160,7 +188,8 @@ async def moderate_message(message: Message) -> None:
 
         # Links
         if reason is None and settings.get("filter_links", False):
-            if _URL_RE.search(text):
+            domains = _extract_domains(text)
+            if domains and not all(_domain_is_allowed(d, settings.get("allowed_domains", [])) for d in domains):
                 reason = t("mod_links", lang)
 
         # (Media filtering lives in moderate_filtered_media — text never has media.)

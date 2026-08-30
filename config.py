@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     BOT_TOKEN: str
     DATABASE_URL: str = "sqlite+aiosqlite:///data/tgbot.db"
     LOG_LEVEL: str = "INFO"
+    # Local timezone for daily resets, birthdays, digests (VPS runs UTC)
+    TIMEZONE: str = "Europe/Moscow"
 
     # Throttling defaults
     THROTTLE_MESSAGES: int = 10

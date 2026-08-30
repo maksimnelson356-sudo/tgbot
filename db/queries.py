@@ -1,7 +1,8 @@
 import datetime
+import json
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -129,6 +130,46 @@ async def update_chat_settings(
     return chat
 
 
+async def set_chat_setting(
+    session: AsyncSession, chat_id: int, key: str, value
+) -> Optional[Chat]:
+    """Atomically set ONE chat setting — no read-modify-write race.
+
+    ``chat_id`` is the internal ``chats.id`` primary key. Uses SQLite
+    ``json_set`` so concurrent writes of different keys never clobber
+    each other (the old whole-JSON merge did).
+    """
+    chat = await session.get(Chat, chat_id)
+    if chat is None:
+        return None
+
+    if value is None:
+        # Remove the key entirely (e.g. clearing the log channel)
+        sql = text(
+            "UPDATE chats SET settings = json_remove(COALESCE(settings, '{}'), :path) "
+            "WHERE id = :id"
+        )
+        params = {"path": f"$.{key}", "id": chat_id}
+    else:
+        # json(:value) re-parses the JSON-encoded value so bool/str/int/list
+        # types survive the trip through the JSON column.
+        sql = text(
+            "UPDATE chats SET settings = json_set(COALESCE(settings, '{}'), :path, json(:value)) "
+            "WHERE id = :id"
+        )
+        params = {
+            "path": f"$.{key}",
+            "id": chat_id,
+            "value": json.dumps(value, ensure_ascii=False),
+        }
+
+    await session.execute(sql, params)
+    await session.commit()
+    # Re-sync the ORM object so callers see the fresh value immediately.
+    await session.refresh(chat)
+    return chat
+
+
 async def get_all_chat_ids(session: AsyncSession) -> list[int]:
     stmt = select(Chat.telegram_id)
     result = await session.execute(stmt)
@@ -164,8 +205,15 @@ async def increment_warnings(session: AsyncSession, chat_id: int, user_id: int) 
     member = await get_chat_member(session, chat_id, user_id)
     if member is None:
         member = await add_chat_member(session, chat_id, user_id)
-    member.warnings_count += 1
+    # Atomic increment — no read-modify-write race on concurrent warns
+    # (coalesce guards legacy rows where the counter may be NULL)
+    await session.execute(
+        update(ChatMember)
+        .where(ChatMember.chat_id == chat_id, ChatMember.user_id == user_id)
+        .values(warnings_count=func.coalesce(ChatMember.warnings_count, 0) + 1)
+    )
     await session.commit()
+    await session.refresh(member)
     return member.warnings_count
 
 
@@ -297,9 +345,13 @@ async def get_last_rep_given_at(
 async def count_rep_given_today(
     session: AsyncSession, chat_id: int, giver_user_id: int
 ) -> int:
-    """How many rep points the giver has handed out in this chat today."""
+    """How many rep points the giver has handed out in this chat today.
+
+    "Today" is bounded by the configured local timezone, not server-UTC.
+    """
     from sqlalchemy import select, func
-    day_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    from utils.time_utils import start_of_day_utc_naive
+    day_start = start_of_day_utc_naive()
     stmt = select(func.count(Reputation.id)).where(
         Reputation.chat_id == chat_id,
         Reputation.given_by == giver_user_id,
@@ -432,7 +484,8 @@ async def log_message(
     user_id: int,
     message_id: int,
     text: Optional[str] = None,
-) -> MessageLog:
+) -> Optional[MessageLog]:
+    """Log a message — silently ignore duplicates (Telegram can deliver the same update twice)."""
     msg_log = MessageLog(
         chat_id=chat_id,
         user_id=user_id,
@@ -440,7 +493,11 @@ async def log_message(
         text=text,
     )
     session.add(msg_log)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        return None
     return msg_log
 
 
@@ -698,6 +755,15 @@ async def delete_old_message_logs(session: AsyncSession, days: int = 30) -> int:
     return result.rowcount or 0
 
 
+async def delete_old_action_logs(session: AsyncSession, days: int = 90) -> int:
+    """Retention job: delete action log rows older than N days. Returns count."""
+    from sqlalchemy import delete as sa_delete
+    cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
+    result = await session.execute(sa_delete(ActionLog).where(ActionLog.created_at < cutoff))
+    await session.commit()
+    return result.rowcount or 0
+
+
 # ── XP / levels / daily bonus (G2) ────────────────────────────────────────────
 
 def level_for_xp(xp: int) -> int:
@@ -718,8 +784,14 @@ async def add_xp(
     member = await get_chat_member(session, chat_id, user_id)
     if member is None:
         return 0, 0
-    member.xp = (member.xp or 0) + amount
+    # Atomic increment — no read-modify-write race on concurrent XP grants
+    await session.execute(
+        update(ChatMember)
+        .where(ChatMember.chat_id == chat_id, ChatMember.user_id == user_id)
+        .values(xp=ChatMember.xp + amount)
+    )
     await session.commit()
+    await session.refresh(member)
     return member.xp, level_for_xp(member.xp)
 
 
@@ -729,15 +801,17 @@ async def claim_daily(
     """Claim the daily streak bonus.
 
     Returns (claimed, streak, xp_reward). Streak continues when claimed
-    on consecutive calendar days, otherwise resets to 1.
+    on consecutive LOCAL calendar days (configured timezone), otherwise
+    resets to 1.
     """
     import datetime as _dt
+    from utils.time_utils import now_utc_naive, today_local, start_of_local_day_for
 
     member = await get_chat_member(session, chat_id, user_id)
     if member is None:
         return False, 0, 0
 
-    now = _dt.datetime.now()
+    now = now_utc_naive()
     last = member.last_daily_at
     consecutive = False
 
@@ -745,7 +819,7 @@ async def claim_daily(
         elapsed = (now - last).total_seconds()
         if elapsed < 20 * 3600:  # less than ~a day — not yet
             return False, member.daily_streak or 0, 0
-        consecutive = last.date() == (now - _dt.timedelta(days=1)).date()
+        consecutive = start_of_local_day_for(last) == (today_local() - _dt.timedelta(days=1))
 
     if consecutive:
         member.daily_streak = (member.daily_streak or 0) + 1

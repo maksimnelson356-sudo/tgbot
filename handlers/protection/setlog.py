@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from db.base import async_session_factory
-from db.queries import get_or_create_chat, update_chat_settings
+from db.queries import get_or_create_chat, set_chat_setting
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
 
@@ -25,7 +25,7 @@ async def cmd_setlog(message: Message) -> None:
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
-        await update_chat_settings(session, chat.id, {"log_chat_id": log_id})
+        await set_chat_setting(session, chat.id, "log_chat_id", log_id)
 
     await message.answer(f"✅ Log channel set! Events will be forwarded there.")
 
@@ -35,6 +35,6 @@ async def cmd_remlog(message: Message) -> None:
     """Remove log channel."""
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
-        await update_chat_settings(session, chat.id, {"log_chat_id": None})
+        await set_chat_setting(session, chat.id, "log_chat_id", None)
 
     await message.answer("✅ Log channel removed.")

@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from db.base import async_session_factory
-from db.queries import get_or_create_chat, update_chat_settings
+from db.queries import get_or_create_chat, set_chat_setting
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
 from utils.helpers import escape_html
@@ -60,7 +60,7 @@ async def cmd_addreply(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         replies = (chat.settings or {}).get(SAVE_KEY, {})
         replies[kw] = reply
-        await update_chat_settings(session, chat.id, {SAVE_KEY: replies})
+        await set_chat_setting(session, chat.id, SAVE_KEY, replies)
 
     await message.answer(f"✅ Auto-reply added: '{escape_html(kw)}' → '{escape_html(reply)}'")
 
@@ -78,7 +78,7 @@ async def cmd_delreply(message: Message) -> None:
         replies = (chat.settings or {}).get(SAVE_KEY, {})
         if kw in replies:
             del replies[kw]
-            await update_chat_settings(session, chat.id, {SAVE_KEY: replies})
+            await set_chat_setting(session, chat.id, SAVE_KEY, replies)
             await message.answer(f"✅ Deleted reply for '{escape_html(kw)}'")
         else:
             await message.answer(f"❌ No reply for '{escape_html(kw)}'")

@@ -4,7 +4,7 @@ from aiogram import Router, F
 from aiogram.types import Message
 
 from db.base import async_session_factory
-from db.queries import get_or_create_chat, update_chat_settings
+from db.queries import get_or_create_chat, set_chat_setting
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
 from utils.helpers import escape_html
@@ -67,7 +67,7 @@ async def handle_webapp_data(message: Message) -> None:
                 session, telegram_id=target_chat_tg_id,
                 title=None, chat_type="supergroup",
             )
-            await update_chat_settings(session, chat_db.id, {key: value})
+            await set_chat_setting(session, chat_db.id, key, value)
 
         status = t("on", lang) if value else t("off", lang)
 

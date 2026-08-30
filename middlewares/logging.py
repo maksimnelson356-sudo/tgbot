@@ -15,6 +15,16 @@ logger = logging.getLogger(__name__)
 _xp_timestamps: dict[int, float] = {}
 _XP_COOLDOWN = 30.0
 _XP_PER_MESSAGE = 1
+_MAX_XP_TRACKED = 10000
+
+
+def _prune_xp_timestamps(now: float) -> None:
+    """Drop stale entries once the dict grows large, keeping it bounded."""
+    if len(_xp_timestamps) <= _MAX_XP_TRACKED:
+        return
+    stale = [uid for uid, ts in _xp_timestamps.items() if now - ts >= _XP_COOLDOWN]
+    for uid in stale:
+        _xp_timestamps.pop(uid, None)
 
 
 def _member_xp(session, chat_pk: int, user_pk: int):
@@ -75,6 +85,7 @@ class LoggingMiddleware(BaseMiddleware):
         last = _xp_timestamps.get(user_pk, 0)
         if now - last < _XP_COOLDOWN:
             return
+        _prune_xp_timestamps(now)
         _xp_timestamps[user_pk] = now
 
         async def _award() -> None:

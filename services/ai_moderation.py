@@ -16,6 +16,16 @@ _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.
 # Per-chat cooldown to avoid rate limits: skip AI check if last call was <2s ago
 _last_call_times: dict[int, float] = {}
 _MIN_INTERVAL: float = 2.0
+_MAX_TRACKED_CHATS = 1000
+
+
+def _prune_last_calls(now: float) -> None:
+    """Drop stale per-chat markers once the dict grows large."""
+    if len(_last_call_times) <= _MAX_TRACKED_CHATS:
+        return
+    stale = [cid for cid, ts in _last_call_times.items() if now - ts >= _MIN_INTERVAL]
+    for cid in stale:
+        _last_call_times.pop(cid, None)
 
 _MODERATION_PROMPT = """You are a content moderation assistant for a Telegram group chat. Analyze the following content and determine if it violates Telegram's Terms of Service or the group's rules.
 
@@ -51,6 +61,7 @@ async def check_text(text: str, chat_id: int = 0) -> Optional[dict]:
     now = time.time()
     if now - _last_call_times.get(chat_id, 0) < _MIN_INTERVAL:
         return None
+    _prune_last_calls(now)
     _last_call_times[chat_id] = now
 
     payload = {
