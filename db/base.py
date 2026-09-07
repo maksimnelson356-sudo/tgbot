@@ -177,9 +177,12 @@ async def _drop_stale_fks_sqlite() -> None:
 
                 # Reset autoincrement so future inserts start after the
                 # restored rows (otherwise INSERTs may collide with old ids).
-                await conn.execute(text(
-                    f"UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM {table}) WHERE name='{table}'"
-                ))
+                try:
+                    await conn.execute(text(
+                        f"UPDATE sqlite_sequence SET seq = (SELECT MAX(id) FROM {table}) WHERE name='{table}'"
+                    ))
+                except Exception:
+                    pass  # sqlite_sequence may not exist on fresh DBs
         finally:
             await conn.execute(text("PRAGMA foreign_keys=ON"))
 
