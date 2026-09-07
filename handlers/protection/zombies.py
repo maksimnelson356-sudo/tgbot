@@ -85,7 +85,7 @@ async def cmd_zombies(message: Message) -> None:
         await asyncio.sleep(3)
 
         lines = [
-            "✅ <b>Zombie cleanup complete!</b>",
+            "✅ <b>Очистка завершена!</b>",
             f"👥 Всего участников: {count}",
             f"🤖 Ботов: {bots}",
             f"🧟 Удалённых аккаунтов: {deleted}",

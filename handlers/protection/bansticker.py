@@ -19,7 +19,7 @@ async def cmd_bansticker(message: Message) -> None:
     """Ban a sticker. Usage: reply to sticker with /bansticker"""
     sticker = message.reply_to_message.sticker
     if sticker is None:
-        await message.answer("Reply to a sticker to ban it!")
+        await message.answer("Ответь на стикер, чтобы забанить!")
         return
 
     async with async_session_factory() as session:
@@ -30,7 +30,7 @@ async def cmd_bansticker(message: Message) -> None:
             sticker.emoji, user.id,
         )
 
-    await message.answer(f"🚫 Sticker banned! Emoji: {sticker.emoji}")
+    await message.answer(f"🚫 Стикер забанен! Эмодзи: {sticker.emoji}")
     try:
         await message.delete()
     except Exception:
@@ -41,7 +41,7 @@ async def cmd_bansticker(message: Message) -> None:
 async def cmd_unbansticker(message: Message) -> None:
     """Unban a sticker. Usage: reply to sticker with /unbansticker"""
     if not message.reply_to_message or not message.reply_to_message.sticker:
-        await message.answer("Reply to a sticker to unban it!")
+        await message.answer("Ответь на стикер, чтобы разбанить!")
         return
 
     sticker = message.reply_to_message.sticker
@@ -49,7 +49,7 @@ async def cmd_unbansticker(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         ok = await unban_sticker(session, chat.id, sticker.file_unique_id)
 
-    await message.answer("✅ Sticker unbanned!" if ok else "❌ Sticker not found in ban list.")
+    await message.answer("✅ Стикер разбанен!" if ok else "❌ Стикер не найден в списке банов.")
 
 
 @router.message(Command("listbanned"), IsGroup(), HasRank(2))
@@ -60,10 +60,10 @@ async def cmd_listbanned(message: Message) -> None:
         banned = await list_banned_stickers(session, chat.id)
 
     if not banned:
-        await message.answer("No banned stickers.")
+        await message.answer("Нет забаненных стикеров.")
         return
 
-    lines = ["🚫 <b>Banned stickers:</b>"]
+    lines = ["🚫 <b>Забаненные стикеры:</b>"]
     for i, bs in enumerate(banned, 1):
         lines.append(f"{i}. {bs.emoji or '❓'} (ID: {bs.file_unique_id[:12]}...)")
 

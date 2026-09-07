@@ -24,15 +24,15 @@ async def cmd_id(message: Message) -> None:
             f"🆔 ID: <code>{target.id}</code>",
         ]
         if message.chat.type in ("group", "supergroup"):
-            lines.append(f"💬 Chat ID: <code>{message.chat.id}</code>")
+            lines.append(f"💬 ID чата: <code>{message.chat.id}</code>")
         keep_next(message)
         await message.answer("\n".join(lines))
     else:
         lines = [
-            f"🆔 Your ID: <code>{message.from_user.id}</code>",
+            f"🆔 Твой ID: <code>{message.from_user.id}</code>",
         ]
         if message.chat.type in ("group", "supergroup"):
-            lines.append(f"💬 Chat ID: <code>{message.chat.id}</code>")
+            lines.append(f"💬 ID чата: <code>{message.chat.id}</code>")
         keep_next(message)
         await message.answer("\n".join(lines))
 
@@ -53,12 +53,12 @@ async def cmd_info(message: Message) -> None:
 
     lines = [f"👤 <b>{escape_html(target.first_name)}</b>"]
     if target.last_name:
-        lines.append(f"📛 Full name: {escape_html(target.first_name)} {escape_html(target.last_name)}")
+        lines.append(f"📛 Полное имя: {escape_html(target.first_name)} {escape_html(target.last_name)}")
     if target.username:
-        lines.append(f"📧 Username: @{escape_html(target.username)}")
+        lines.append(f"📧 Юзернейм: @{escape_html(target.username)}")
     lines.append(f"🆔 ID: <code>{target.id}</code>")
     if target.language_code:
-        lines.append(f"🌐 Lang: {target.language_code}")
+        lines.append(f"🌐 Язык: {target.language_code}")
 
     # Get DB info (warnings, join date)
     if message.chat.type in ("group", "supergroup"):
@@ -73,25 +73,25 @@ async def cmd_info(message: Message) -> None:
             member = await get_chat_member(session, chat.id, user.id)
             if member:
                 if member.joined_at:
-                    lines.append(f"📅 Joined: {member.joined_at.strftime('%Y-%m-%d')}")
+                    lines.append(f"📅 Вступил: {member.joined_at.strftime('%Y-%m-%d')}")
                 if member.warnings_count > 0:
-                    lines.append(f"⚠️ Warnings: {member.warnings_count}")
+                    lines.append(f"⚠️ Предупреждения: {member.warnings_count}")
                 if member.is_muted:
-                    lines.append("🔇 <b>MUTED</b>")
+                    lines.append("🔇 <b>ЗАМУЧЕН</b>")
 
         # Check admin status
         try:
             chat_member = await message.chat.get_member(target.id)
             status_map = {
-                "creator": "👑 Creator",
-                "administrator": "🛡 Admin",
-                "member": "👤 Member",
-                "restricted": "🔒 Restricted",
-                "left": "🚪 Left",
-                "kicked": "🚫 Banned",
+                "creator": "👑 Владелец",
+                "administrator": "🛡 Админ",
+                "member": "👤 Участник",
+                "restricted": "🔒 Ограничен",
+                "left": "🚪 Вышел",
+                "kicked": "🚫 Забанен",
             }
             status = status_map.get(chat_member.status, chat_member.status)
-            lines.append(f"📌 Role: {status}")
+            lines.append(f"📌 Роль: {status}")
         except Exception:
             pass
 

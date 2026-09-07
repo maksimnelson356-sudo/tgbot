@@ -201,12 +201,12 @@ async def moderate_message(message: Message) -> None:
         # Anti-forward (block forwarded channel messages)
         if reason is None and settings.get("antiforward_enabled", False):
             if message.forward_from_chat:
-                reason = "Forwarded message blocked"
+                reason = "Пересылка сообщений запрещена"
 
         # Anti-phone/email
         if reason is None and settings.get("antispam_contacts", False):
             if has_phone(text) or has_email(text):
-                reason = "Phone/email blocked"
+                reason = "Телефон/email запрещены"
 
         # AI moderation (Gemini) — fallback if word-lists missed something
         if reason is None and settings.get("moderation_enabled", True):
@@ -358,7 +358,7 @@ async def moderate_forwarded(message: Message) -> None:
             pass
 
         await handle_warning(
-            session, chat, user, message, "Forwarded message blocked", lang, chat.settings or {}
+            session, chat, user, message, "Пересылка сообщений запрещена", lang, chat.settings or {}
         )
 
 

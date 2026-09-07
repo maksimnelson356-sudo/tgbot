@@ -30,17 +30,17 @@ async def cmd_rate(message: Message) -> None:
     import datetime
 
     if message.reply_to_message is None or message.reply_to_message.from_user is None:
-        await message.answer("Reply to a user to give them reputation!")
+        await message.answer("Ответь на сообщение пользователя, чтобы поставить репутацию!")
         return
 
     target = message.reply_to_message.from_user
     giver = message.from_user
 
     if target.id == giver.id:
-        await message.answer("You can't rate yourself!")
+        await message.answer("Нельзя ставить оценку самому себе!")
         return
     if target.is_bot:
-        await message.answer("You can't rate bots!")
+        await message.answer("Нельзя ставить оценку ботам!")
         return
 
     async with async_session_factory() as session:
@@ -101,10 +101,10 @@ async def cmd_toprep(message: Message) -> None:
         top = await get_top_reputation(session, chat.id, limit=10)
 
     if not top:
-        await message.answer("No ratings yet!")
+        await message.answer("Пока нет оценок!")
         return
 
-    lines = ["🏆 <b>Reputation Top</b>"]
+    lines = ["🏆 <b>Топ репутации</b>"]
     for i, (user_id, rep) in enumerate(top, 1):
         async with async_session_factory() as session:
             user = await get_or_create_user(session, telegram_id=user_id)

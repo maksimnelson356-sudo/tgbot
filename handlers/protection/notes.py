@@ -11,17 +11,22 @@ from utils.helpers import display_name, escape_html, keep_next
 router = Router()
 router.name = "notes"
 
+_MAX_NOTE_TEXT = 500
+
 
 @router.message(Command("note"), IsGroup(), HasRank(2))
 async def cmd_note(message: Message) -> None:
     """Add a note about a user. Usage: /note <reply> text"""
     if message.reply_to_message is None or message.reply_to_message.from_user is None:
-        await message.answer("Reply to a user to add a note about them.")
+        await message.answer("Ответь на сообщение пользователя, чтобы добавить заметку.")
         return
 
     text = message.text.removeprefix("/note").strip()
     if not text:
-        await message.answer("Usage: /note <reply> <text>")
+        await message.answer("Использование: /note <ответ> <текст>")
+        return
+    if len(text) > _MAX_NOTE_TEXT:
+        await message.answer(f"❌ Текст заметки слишком длинный (макс. {_MAX_NOTE_TEXT} символов).")
         return
 
     target = message.reply_to_message.from_user
@@ -34,7 +39,7 @@ async def cmd_note(message: Message) -> None:
         note = await add_note(session, chat.id, user.id, admin.id, text)
         mention = display_name(target)
 
-        await message.answer(f"📝 Note added for {mention} (ID: {note.id})")
+        await message.answer(f"📝 Заметка добавлена для {mention} (ID: {note.id})")
 
 
 @router.message(Command("notes"), IsGroup(), HasRank(2))
@@ -45,7 +50,7 @@ async def cmd_notes(message: Message) -> None:
         target = message.reply_to_message.from_user
 
     if target is None:
-        await message.answer("Reply to a user to see their notes.")
+        await message.answer("Ответь на сообщение пользователя, чтобы посмотреть заметки.")
         return
 
     async with async_session_factory() as session:
@@ -56,10 +61,10 @@ async def cmd_notes(message: Message) -> None:
     mention = display_name(target)
 
     if not notes:
-        await message.answer(f"No notes for {mention}.")
+        await message.answer(f"Нет заметок для {mention}.")
         return
 
-    lines = [f"📝 <b>Notes for {mention}</b>"]
+    lines = [f"📝 <b>Заметки для {mention}</b>"]
     for i, n in enumerate(notes, 1):
         # Get admin name
         admin_name = f"admin#{n.admin_id}"
@@ -74,19 +79,19 @@ async def cmd_delnote(message: Message) -> None:
     """Delete a note by ID. Usage: /delnote <note_id>"""
     args = message.text.removeprefix("/delnote").strip()
     if not args:
-        await message.answer("Usage: /delnote <note_id>")
+        await message.answer("Использование: /delnote <id_ заметки>")
         return
 
     try:
         note_id = int(args)
     except ValueError:
-        await message.answer("Invalid note ID. Usage: /delnote <note_id>")
+        await message.answer("Неверный ID заметки. Использование: /delnote <id_ заметки>")
         return
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         success = await delete_note(session, note_id, chat_id=chat.id)
         if success:
-            await message.answer(f"✅ Note {note_id} deleted.")
+            await message.answer(f"✅ Заметка {note_id} удалена.")
         else:
-            await message.answer(f"❌ Note {note_id} not found.")
+            await message.answer(f"❌ Заметка {note_id} не найдена.")

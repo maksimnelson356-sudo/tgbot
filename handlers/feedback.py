@@ -15,12 +15,12 @@ async def cmd_feedback(message: Message) -> None:
     """Send feedback to the bot owner. Usage: /feedback <text>"""
     text = message.text.removeprefix("/feedback").strip()
     if not text:
-        await message.answer("Usage: /feedback <your message>")
+        await message.answer("Использование: /feedback <сообщение>")
         return
 
     owner_id = settings.OWNER_ID
     if not owner_id:
-        await message.answer("Bot owner not configured.")
+        await message.answer("Владелец бота не настроен.")
         return
 
     try:
@@ -31,6 +31,6 @@ async def cmd_feedback(message: Message) -> None:
             f"Chat: {message.chat.title or 'PM'}\n"
             f"Message: {text}",
         )
-        await message.answer("✅ Feedback sent to owner!")
+        await message.answer("✅ Сообщение отправлено владельцу!")
     except Exception as e:
-        await message.answer(f"❌ Error: {e}")
+        await message.answer(f"❌ Ошибка: {e}")

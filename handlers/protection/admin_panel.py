@@ -102,10 +102,10 @@ async def admin_callback(callback: CallbackQuery) -> None:
         await callback.answer()
         return
     if callback.message.chat.type not in ("group", "supergroup"):
-        await callback.answer("Not a group!")
+        await callback.answer("Не группа!")
         return
     if not await _check_admin_access(callback.message.chat, callback.from_user.id):
-        await callback.answer("Admins only!")
+        await callback.answer("Только для админов!")
         return
 
     action = callback.data.removeprefix("admin:")
@@ -128,7 +128,7 @@ async def admin_callback(callback: CallbackQuery) -> None:
     }
     setting_key = key_map.get(action)
     if setting_key is None:
-        await callback.answer("Unknown action")
+        await callback.answer("Неизвестное действие")
         return
 
     async with async_session_factory() as session:

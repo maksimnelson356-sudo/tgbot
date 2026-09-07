@@ -77,7 +77,7 @@ def _format_duration(seconds: int) -> str:
     return f"{seconds}s"
 
 
-async def _do_warn(message: Message, reason: str = "No reason provided") -> None:
+async def _do_warn(message: Message, reason: str = "Без причины") -> None:
     """Shared warn logic for /warn command and 'Пред' text command."""
     lang = await get_user_lang(message)
     if message.reply_to_message is None or message.reply_to_message.from_user is None:
@@ -113,7 +113,7 @@ async def _do_warn(message: Message, reason: str = "No reason provided") -> None
                     until_date=until_date,
                 )
             except Exception as e:
-                await message.answer(f"⚠️ Cannot restrict: {e}. Make bot admin!")
+                await message.answer(f"⚠️ Не удалось ограничить: {e}. Сделай бота админом!")
                 return
             await message.answer(t("warn_auto_muted", lang, user=mention))
 
@@ -127,7 +127,7 @@ async def _do_mute(message: Message, args: str = "") -> None:
 
     target = message.reply_to_message.from_user
     duration = 3600
-    reason = "No reason"
+    reason = "Без причины"
     if args:
         parts = args.split(maxsplit=1)
         duration = _parse_duration(parts[0])
@@ -158,7 +158,7 @@ async def _do_mute(message: Message, args: str = "") -> None:
     await message.answer(t("mute_message", lang, user=get_user_mention(target), duration=_format_duration(duration), reason=escape_html(reason)))
 
 
-async def _do_ban(message: Message, reason: str = "No reason") -> None:
+async def _do_ban(message: Message, reason: str = "Без причины") -> None:
     """Shared ban logic for /ban command and 'Бан' text command."""
     lang = await get_user_lang(message)
     if message.reply_to_message is None or message.reply_to_message.from_user is None:
@@ -173,7 +173,7 @@ async def _do_ban(message: Message, reason: str = "No reason") -> None:
             user_id=target.id,
         )
     except Exception as e:
-        await message.answer(f"⚠️ Cannot ban: {e}. Make bot admin!")
+        await message.answer(f"⚠️ Не удалось забанить: {e}. Сделай бота админом!")
         return
 
     mention = get_user_mention(target)
@@ -191,7 +191,7 @@ async def _do_ban(message: Message, reason: str = "No reason") -> None:
 
 @router.message(Command("warn"), IsGroup(), HasRank(1))
 async def cmd_warn(message: Message) -> None:
-    reason = message.text.removeprefix("/warn").strip() or "No reason provided"
+    reason = message.text.removeprefix("/warn").strip() or "Без причины"
     await _do_warn(message, reason)
 
 
@@ -253,14 +253,14 @@ async def cmd_unmute(message: Message) -> None:
             permissions=DEFAULT_MEMBER_PERMISSIONS,
         )
     except Exception as e:
-        await message.answer(f"⚠️ Cannot unrestrict: {e}")
+        await message.answer(f"⚠️ Не удалось снять ограничения: {e}")
 
     await message.answer(t("unmute_message", lang, user=get_user_mention(target)))
 
 
 @router.message(Command("ban"), IsGroup(), HasRank(2))
 async def cmd_ban(message: Message) -> None:
-    reason = message.text.removeprefix("/ban").strip() or "No reason"
+    reason = message.text.removeprefix("/ban").strip() or "Без причины"
     await _do_ban(message, reason)
 
 
@@ -271,7 +271,7 @@ async def cmd_list_warnings(message: Message) -> None:
     if message.reply_to_message and message.reply_to_message.from_user:
         target = message.reply_to_message.from_user
     if target is None:
-        await message.answer("Reply to a user to see their warnings.")
+        await message.answer("Ответь на сообщение пользователя, чтобы посмотреть его предупреждения.")
         return
 
     async with async_session_factory() as session:

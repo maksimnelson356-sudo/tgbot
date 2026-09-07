@@ -25,13 +25,13 @@ router.name = "utilities"
 async def cmd_pin(message: Message) -> None:
     """Pin a message. Reply to a message with /pin"""
     if not message.reply_to_message:
-        await message.answer("Reply to a message to pin it!")
+        await message.answer("Ответь на сообщение, чтобы закрепить!")
         return
     try:
         await message.reply_to_message.pin(disable_notification=True)
-        await message.answer("📌 Pinned!")
+        await message.answer("📌 Закреплено!")
     except Exception as e:
-        await message.answer(f"⚠️ Cannot pin: {e}")
+        await message.answer(f"⚠️ Не удалось закрепить: {e}")
 
 
 @router.message(Command("unpin"), IsGroup(), HasRank(2))
@@ -41,14 +41,14 @@ async def cmd_unpin(message: Message) -> None:
     try:
         if args.lower() == "all":
             await message.chat.unpin_all_messages()
-            await message.answer("📌 All unpinned!")
+            await message.answer("📌 Все откреплены!")
         elif message.reply_to_message:
             await message.reply_to_message.unpin()
-            await message.answer("📌 Unpinned!")
+            await message.answer("📌 Откреплено!")
         else:
-            await message.answer("Reply to a message or use /unpin all")
+            await message.answer("Ответь на сообщение или используй /unpin all")
     except Exception as e:
-        await message.answer(f"⚠️ Cannot unpin: {e}")
+        await message.answer(f"⚠️ Не удалось открепить: {e}")
 
 
 # ── /admins ────────────────────────────────────────────────────────────────────
@@ -56,17 +56,17 @@ async def cmd_unpin(message: Message) -> None:
 @router.message(Command("admins"), IsGroup())
 async def cmd_admins(message: Message) -> None:
     """List all Telegram admins + bot-level admins."""
-    lines = ["👑 <b>Admins:</b>"]
+    lines = ["👑 <b>Админы:</b>"]
 
     # Telegram admins
     try:
         admins = await message.chat.get_administrators()
         for a in admins:
             user = a.user
-            role = "👑 Creator" if a.status == "creator" else "🛡 Admin"
+            role = "👑 Владелец" if a.status == "creator" else "🛡 Админ"
             lines.append(f"{role}: {display_name(user)}")
     except Exception:
-        lines.append("(cannot fetch Telegram admin list)")
+        lines.append("(не удалось получить список админов)")
 
     # Bot-level admins
     async with async_session_factory() as session:
@@ -76,7 +76,7 @@ async def cmd_admins(message: Message) -> None:
 
     if bot_admins:
         lines.append("")
-        lines.append("🤖 <b>Bot admins:</b>")
+        lines.append("🤖 <b>Админы бота:</b>")
         for a, rank in bot_admins:
             rank_icons = {1: "🔰", 2: "🛡️", 3: "👑"}
             icon = rank_icons.get(rank, "❓")
@@ -104,11 +104,11 @@ async def cmd_mutelist(message: Message) -> None:
         muted = list(result.scalars().all())
 
     if not muted:
-        await message.answer("🔇 No one is muted.")
+        await message.answer("🔇 Нет замученных.")
         return
 
     now = datetime.datetime.now()
-    lines = ["🔇 <b>Muted users:</b>"]
+    lines = ["🔇 <b>Замученные:</b>"]
     for m in muted:
         from db.queries import get_user_by_id
         async with async_session_factory() as s:
@@ -116,7 +116,7 @@ async def cmd_mutelist(message: Message) -> None:
         name = escape_html(user.first_name) if user else f"User #{m.user_id}"
         remaining = ""
         if m.muted_until and m.muted_until > now:
-            remaining = f" ({int((m.muted_until - now).total_seconds()//60)}min left)"
+            remaining = f" (осталось {int((m.muted_until - now).total_seconds()//60)}мин)"
         lines.append(f"• {name}{remaining}")
     keep_next(message)
     await message.answer("\n".join(lines))
@@ -133,7 +133,7 @@ async def cmd_clean(message: Message) -> None:
     """
     from utils.helpers import pending_message_ids, pop_pending_delete
 
-    status = await message.answer("🧹 Cleaning...")
+    status = await message.answer("🧹 Очистка...")
     deleted = 0
     for msg_id in pending_message_ids(message.chat.id):
         task = pop_pending_delete(message.chat.id, msg_id)
@@ -145,7 +145,7 @@ async def cmd_clean(message: Message) -> None:
         except Exception:
             pass
     try:
-        await status.edit_text(f"🧹 Deleted {deleted} bot messages.")
+        await status.edit_text(f"🧹 Удалено {deleted} сообщений бота.")
     except Exception:
         pass
 
@@ -157,7 +157,7 @@ async def cmd_allowlink(message: Message) -> None:
     """Whitelist a domain. Usage: /allowlink <domain>"""
     domain = message.text.removeprefix("/allowlink").strip().lower()
     if not domain:
-        await message.answer("Usage: /allowlink <domain>")
+        await message.answer("Использование: /allowlink <домен>")
         return
 
     async with async_session_factory() as session:
@@ -167,7 +167,7 @@ async def cmd_allowlink(message: Message) -> None:
         if domain not in allowed:
             allowed.append(domain)
             await set_chat_setting(session, chat.id, "allowed_domains", allowed)
-        await message.answer(f"✅ Domain <b>{escape_html(domain)}</b> whitelisted!")
+        await message.answer(f"✅ Домен <b>{escape_html(domain)}</b> разрешён!")
 
 
 # ── Auto-unmute (runs every 5 min via task) ───────────────────────────────────

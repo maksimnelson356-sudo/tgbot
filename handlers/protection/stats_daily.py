@@ -35,19 +35,19 @@ async def cmd_daystats(message: Message) -> None:
         rows = result.all()
 
     if not rows:
-        await message.answer("📊 No messages today yet.")
+        await message.answer("📊 Сегодня ещё нет сообщений.")
         return
 
     counter = Counter(r[0] for r in rows)
     total = len(rows)
 
-    lines = [f"📊 <b>Today's stats</b> — {total} messages\n"]
+    lines = [f"📊 <b>Статистика дня</b> — {total} сообщений\n"]
     for user_id, count in counter.most_common(10):
         from db.queries import get_or_create_user
         async with async_session_factory() as s:
             user = await get_or_create_user(s, telegram_id=user_id)
         name = escape_html(user.first_name or f"User {user_id}")
-        lines.append(f"  {name}: {count} msgs")
+        lines.append(f"  {name}: {count} сообщ.")
 
     keep_next(message)
     await message.answer("\n".join(lines))
@@ -77,11 +77,11 @@ async def cmd_topact(message: Message) -> None:
         rows = result.all()
 
     if not rows:
-        await message.answer("📊 No activity this week yet.")
+        await message.answer("📊 На этой неделе ещё нет активности.")
         return
 
     total = sum(r[1] for r in rows)
-    lines = [f"🏆 <b>Top Active (7 days)</b> — {total} messages\n"]
+    lines = [f"🏆 <b>Самые активные (7 дней)</b> — {total} сообщений\n"]
     for i, (user_id, count) in enumerate(rows, 1):
         from db.queries import get_or_create_user
         async with async_session_factory() as s:

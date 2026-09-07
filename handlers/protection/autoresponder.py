@@ -43,17 +43,27 @@ class HasMatchingAutoReply(Filter):
         return False
 
 
+_MAX_REPLY_KW = 50
+_MAX_REPLY_TEXT = 200
+
+
 @router.message(Command("addreply"), IsGroup(), HasRank(2))
 async def cmd_addreply(message: Message) -> None:
     """Add auto-reply. Usage: /addreply keyword | response"""
     text = message.text.removeprefix("/addreply").strip()
     if "|" not in text:
-        await message.answer('Usage: /addreply keyword | response')
+        await message.answer('Использование: /addreply ключевое_слово | ответ')
         return
     kw, reply = text.split("|", 1)
     kw, reply = kw.strip().lower(), reply.strip()
     if not kw or not reply:
-        await message.answer('Keyword and response required.')
+        await message.answer('Нужно ключевое слово и ответ.')
+        return
+    if len(kw) > _MAX_REPLY_KW:
+        await message.answer(f"❌ Ключевое слово слишком длинное (макс. {_MAX_REPLY_KW} символов).")
+        return
+    if len(reply) > _MAX_REPLY_TEXT:
+        await message.answer(f"❌ Ответ слишком длинный (макс. {_MAX_REPLY_TEXT} символов).")
         return
 
     async with async_session_factory() as session:
@@ -62,7 +72,7 @@ async def cmd_addreply(message: Message) -> None:
         replies[kw] = reply
         await set_chat_setting(session, chat.id, SAVE_KEY, replies)
 
-    await message.answer(f"✅ Auto-reply added: '{escape_html(kw)}' → '{escape_html(reply)}'")
+    await message.answer(f"✅ Автоответ добавлен: '{escape_html(kw)}' → '{escape_html(reply)}'")
 
 
 @router.message(Command("delreply"), IsGroup(), HasRank(2))
@@ -70,7 +80,7 @@ async def cmd_delreply(message: Message) -> None:
     """Delete auto-reply. Usage: /delreply keyword"""
     kw = message.text.removeprefix("/delreply").strip().lower()
     if not kw:
-        await message.answer("Usage: /delreply keyword")
+        await message.answer("Использование: /delreply ключевое_слово")
         return
 
     async with async_session_factory() as session:
@@ -79,9 +89,9 @@ async def cmd_delreply(message: Message) -> None:
         if kw in replies:
             del replies[kw]
             await set_chat_setting(session, chat.id, SAVE_KEY, replies)
-            await message.answer(f"✅ Deleted reply for '{escape_html(kw)}'")
+            await message.answer(f"✅ Удалён ответ для '{escape_html(kw)}'")
         else:
-            await message.answer(f"❌ No reply for '{escape_html(kw)}'")
+            await message.answer(f"❌ Нет ответа для '{escape_html(kw)}'")
 
 
 @router.message(Command("listreplies"), IsGroup(), HasRank(2))
@@ -91,9 +101,9 @@ async def cmd_listreplies(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         replies = (chat.settings or {}).get(SAVE_KEY, {})
     if not replies:
-        await message.answer("No auto-replies set.")
+        await message.answer("Автоответы не установлены.")
         return
-    lines = ["📝 <b>Auto-replies:</b>"]
+    lines = ["📝 <b>Автоответы:</b>"]
     for kw, reply in replies.items():
         lines.append(f"• <b>{escape_html(kw)}</b> → {escape_html(reply[:30])}...")
     await message.answer("\n".join(lines))

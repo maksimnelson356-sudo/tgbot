@@ -13,7 +13,7 @@ router.name = "purge"
 async def cmd_purge(message: Message) -> None:
     """Delete multiple messages at once. Usage: /purge [N] (reply to a message)"""
     if message.reply_to_message is None:
-        await message.answer("Reply to the first message to delete from.")
+        await message.answer("Ответь на первое сообщение для удаления.")
         return
 
     # Parse number of messages to delete (default 10)
@@ -31,7 +31,7 @@ async def cmd_purge(message: Message) -> None:
     # never more than what actually lies between the two IDs.
     span = current_msg_id - reply_msg_id + 1
     if span <= 0:
-        await message.answer("Invalid range — reply to an earlier message.")
+        await message.answer("Неверный диапазон — ответь на более раннее сообщение.")
         return
     to_delete = min(count, span)
 
@@ -44,7 +44,7 @@ async def cmd_purge(message: Message) -> None:
             pass
 
     # Send confirmation and auto-delete it
-    confirm = await message.answer(f"✅ Purged {deleted} messages.")
+    confirm = await message.answer(f"✅ Удалено {deleted} сообщений.")
     try:
         import asyncio
         await asyncio.sleep(3)

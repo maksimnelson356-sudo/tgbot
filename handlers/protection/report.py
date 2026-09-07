@@ -17,11 +17,11 @@ router.name = "report"
 async def cmd_report(message: Message) -> None:
     """Report a message to admins. Usage: /report <reply> [reason]"""
     if message.reply_to_message is None:
-        await message.answer("Reply to the message you want to report.")
+        await message.answer("Ответь на сообщение, на которое хочешь пожаловаться.")
         return
 
     lang = await get_user_lang(message)
-    reason = message.text.removeprefix("/report").strip() or "No reason"
+    reason = message.text.removeprefix("/report").strip() or "Без причины"
 
     reported_msg = message.reply_to_message
     reporter = message.from_user
@@ -31,16 +31,16 @@ async def cmd_report(message: Message) -> None:
 
     # Build report text
     if reported_user:
-        offender_line = f"👤 Offender: {escape_html(reported_user.first_name)} (ID: {reported_user.id})"
+        offender_line = f"👤 Нарушитель: {escape_html(reported_user.first_name)} (ID: {reported_user.id})"
     else:
-        offender_line = "👤 Offender: anonymous/channel"
+        offender_line = "👤 Нарушитель: аноним/канал"
 
     report_text = (
-        f"🚨 <b>Report!</b>\n\n"
-        f"👤 Reporter: {escape_html(reporter.first_name)} (ID: {reporter.id})\n"
+        f"🚨 <b>Жалоба!</b>\n\n"
+        f"👤 От кого: {escape_html(reporter.first_name)} (ID: {reporter.id})\n"
         f"{offender_line}\n"
-        f"📝 Reason: {escape_html(reason)}\n"
-        f"💬 <a href='{reported_msg.get_url()}'>Jump to message</a>"
+        f"📝 Причина: {escape_html(reason)}\n"
+        f"💬 <a href='{reported_msg.get_url()}'>Перейти к сообщению</a>"
     )
 
     # Send report to chat (admins will see it)
@@ -54,9 +54,9 @@ async def cmd_report(message: Message) -> None:
                 try:
                     await message.bot.send_message(
                         admin.user.id,
-                        f"🚨 <b>Report from {escape_html(reporter.first_name)}</b>\n\n{escape_html(reason)}\n\n"
-                        f"Chat: {escape_html(message.chat.title)}\n"
-                        f"<a href='{reported_msg.get_url()}'>View message</a>",
+                        f"🚨 <b>Жалоба от {escape_html(reporter.first_name)}</b>\n\n{escape_html(reason)}\n\n"
+                        f"Чат: {escape_html(message.chat.title)}\n"
+                        f"<a href='{reported_msg.get_url()}'>Посмотреть сообщение</a>",
                     )
                 except Exception:
                     pass
@@ -73,7 +73,7 @@ async def cmd_report(message: Message) -> None:
 @router.message(Command("calladmin"), IsGroup())
 async def cmd_calladmin(message: Message) -> None:
     """Call all admins for help. Usage: /calladmin [reason]"""
-    reason = message.text.removeprefix("/calladmin").strip() or "Help needed!"
+    reason = message.text.removeprefix("/calladmin").strip() or "Нужна помощь!"
 
     # Mention all admins
     admin_mentions = []
@@ -94,12 +94,12 @@ async def cmd_calladmin(message: Message) -> None:
     context = ""
     if message.reply_to_message:
         url = message.reply_to_message.get_url()
-        context = f"\n💬 <a href='{url}'>Context message</a>"
+        context = f"\n💬 <a href='{url}'>Сообщение для контекста</a>"
 
     await message.answer(
-        f"🚨 <b>Admin call!</b>\n\n"
-        f"👤 From: {escape_html(message.from_user.first_name)}\n"
-        f"📝 Reason: {escape_html(reason)}"
+        f"🚨 <b>Вызов админа!</b>\n\n"
+        f"👤 От: {escape_html(message.from_user.first_name)}\n"
+        f"📝 Причина: {escape_html(reason)}"
         f"{context}\n\n"
         f"{mentions}",
     )
@@ -112,9 +112,9 @@ async def cmd_calladmin(message: Message) -> None:
                 try:
                     await message.bot.send_message(
                         admin.user.id,
-                        f"🚨 <b>Admin call in {escape_html(message.chat.title)}</b>\n\n"
-                        f"👤 From: {escape_html(message.from_user.first_name)} (ID: {message.from_user.id})\n"
-                        f"📝 Reason: {escape_html(reason)}",
+                        f"🚨 <b>Вызов админа в {escape_html(message.chat.title)}</b>\n\n"
+                        f"👤 От: {escape_html(message.from_user.first_name)} (ID: {message.from_user.id})\n"
+                        f"📝 Причина: {escape_html(reason)}",
                     )
                 except Exception:
                     pass

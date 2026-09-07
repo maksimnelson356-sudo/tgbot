@@ -130,7 +130,7 @@ async def on_marry_accept(callback: CallbackQuery) -> None:
     try:
         marriage_id = int(marriage_id_str)
     except ValueError:
-        await callback.answer("Invalid", show_alert=True)
+        await callback.answer("Неверные данные", show_alert=True)
         return
 
     lang = await get_user_lang(callback)
@@ -183,7 +183,7 @@ async def on_marry_reject(callback: CallbackQuery) -> None:
     try:
         marriage_id = int(marriage_id_str)
     except ValueError:
-        await callback.answer("Invalid", show_alert=True)
+        await callback.answer("Неверные данные", show_alert=True)
         return
 
     lang = await get_user_lang(callback)

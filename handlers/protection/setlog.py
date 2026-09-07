@@ -20,14 +20,14 @@ async def cmd_setlog(message: Message) -> None:
     elif message.reply_to_message and message.reply_to_message.sender_chat:
         log_id = message.reply_to_message.sender_chat.id
     else:
-        await message.answer("Forward a message from the channel you want as log, or reply to a channel message.")
+        await message.answer("Перешли сообщение из канала для логов, или ответь на сообщение канала.")
         return
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         await set_chat_setting(session, chat.id, "log_chat_id", log_id)
 
-    await message.answer(f"✅ Log channel set! Events will be forwarded there.")
+    await message.answer(f"✅ Канал для логов установлен! События будут пересылаться туда.")
 
 
 @router.message(Command("remlog"), IsGroup(), HasRank(2))
@@ -37,4 +37,4 @@ async def cmd_remlog(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         await set_chat_setting(session, chat.id, "log_chat_id", None)
 
-    await message.answer("✅ Log channel removed.")
+    await message.answer("✅ Канал для логов удалён.")

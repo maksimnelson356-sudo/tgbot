@@ -21,14 +21,14 @@ async def cmd_slowmode(message: Message) -> None:
         async with async_session_factory() as session:
             chat = await get_or_create_chat(session, telegram_id=message.chat.id)
             delay = (chat.settings or {}).get("slowmode_delay", 0)
-        status = f"🐌 Slow mode: {delay}s" if delay > 0 else "🐌 Slow mode: OFF"
-        await message.answer(f"{status}\nUsage: /slowmode <seconds> (0 to disable)")
+        status = f"🐌 Медленный режим: {delay}с" if delay > 0 else "🐌 Медленный режим: ВЫКЛ"
+        await message.answer(f"{status}\nИспользование: /slowmode <секунды> (0 = выключить)")
         return
 
     try:
         delay = max(0, min(int(args), 3600))
     except ValueError:
-        await message.answer("Invalid number.")
+        await message.answer("Неверное число.")
         return
 
     async with async_session_factory() as session:
@@ -36,6 +36,6 @@ async def cmd_slowmode(message: Message) -> None:
         await set_chat_setting(session, chat.id, "slowmode_delay", delay)
 
     if delay > 0:
-        await message.answer(f"🐌 Slow mode set to {delay}s between messages.")
+        await message.answer(f"🐌 Медленный режим: <b>{delay}с</b> между сообщениями.")
     else:
-        await message.answer("🐌 Slow mode disabled.")
+        await message.answer("🐌 Медленный режим выключен.")

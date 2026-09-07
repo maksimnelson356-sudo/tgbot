@@ -14,7 +14,7 @@ async def cmd_weather(message: Message) -> None:
     """Get weather. Usage: /weather <city>"""
     args = message.text.removeprefix("/weather").strip()
     if not args:
-        await message.answer("Usage: /weather <city>")
+        await message.answer("Использование: /weather <город>")
         return
 
     msg = await message.answer(f"🌤 Loading weather for {escape_html(args)}...")

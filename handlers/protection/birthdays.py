@@ -19,15 +19,15 @@ async def cmd_setbday(message: Message) -> None:
     """Set your birthday. Usage: /setbday DD.MM"""
     args = message.text.removeprefix("/setbday").strip()
     if not args or "." not in args:
-        await message.answer("Usage: /setbday DD.MM (e.g. /setbday 15.03)")
+        await message.answer("Использование: /setbday ДД.ММ (например: /setbday 15.03)")
         return
     parts = args.split(".")
     if len(parts) != 2:
-        await message.answer("Usage: /setbday DD.MM")
+        await message.answer("Использование: /setbday ДД.ММ")
         return
     day, month = parts
     if not day.isdigit() or not month.isdigit():
-        await message.answer("Invalid date.")
+        await message.answer("Неверная дата.")
         return
 
     async with async_session_factory() as session:
@@ -36,7 +36,7 @@ async def cmd_setbday(message: Message) -> None:
         bdays[str(message.from_user.id)] = f"{int(day):02d}.{int(month):02d}"
         await set_chat_setting(session, chat.id, SAVE_KEY, bdays)
 
-    await message.answer(f"✅ Birthday set to {int(day):02d}.{int(month):02d}")
+    await message.answer(f"✅ Дата рождения установлена: {int(day):02d}.{int(month):02d}")
 
 
 @router.message(Command("birthdays"), IsGroup())
@@ -49,10 +49,10 @@ async def cmd_birthdays(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         bdays = (chat.settings or {}).get(SAVE_KEY, {})
         if not bdays:
-            await message.answer("No birthdays set. Use /setbday DD.MM")
+            await message.answer("Дни рождения не установлены. Используй /setbday ДД.ММ")
             return
 
-    lines = [f"🎂 <b>Birthdays this month ({now.month:02d}):</b>"]
+    lines = [f"🎂 <b>Дни рождения в этом месяце ({now.month:02d}):</b>"]
     for uid_str, date_str in bdays.items():
         day, month = date_str.split(".")
         if int(month) == now.month:
@@ -63,6 +63,6 @@ async def cmd_birthdays(message: Message) -> None:
             lines.append(f"  • {name} — {int(day)} числа 🎉")
 
     if len(lines) == 1:
-        lines.append("  No birthdays this month.")
+        lines.append("  В этом месяце нет дней рождения.")
 
     await message.answer("\n".join(lines))

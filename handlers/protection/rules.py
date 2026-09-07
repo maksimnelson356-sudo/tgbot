@@ -23,11 +23,11 @@ async def cmd_rules(message: Message) -> None:
         rules = (chat.settings or {}).get("rules", "")
 
     if not rules:
-        await message.answer("📜 No rules set. Admins can use /setrules <text>")
+        await message.answer("📜 Правила не установлены. Админы могут использовать /setrules <текст>")
         return
 
     keep_next(message)
-    await message.answer(f"📜 <b>Rules</b>\n\n{escape_html(rules)}")
+    await message.answer(f"📜 <b>Правила</b>\n\n{escape_html(rules)}")
 
 
 @router.message(Command("setrules"), IsGroup(), HasRank(2))
@@ -35,14 +35,14 @@ async def cmd_setrules(message: Message) -> None:
     """Set chat rules. Usage: /setrules <text>"""
     text = message.text.removeprefix("/setrules").strip()
     if not text:
-        await message.answer("Usage: /setrules <rules text>")
+        await message.answer("Использование: /setrules <текст правил>")
         return
 
     async with async_session_factory() as session:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         await set_chat_setting(session, chat.id, "rules", text)
 
-    await message.answer("✅ Rules updated!")
+    await message.answer("✅ Правила обновлены!")
 
 
 @router.message(Command("delrules"), IsGroup(), HasRank(2))
@@ -52,4 +52,4 @@ async def cmd_delrules(message: Message) -> None:
         chat = await get_or_create_chat(session, telegram_id=message.chat.id)
         await set_chat_setting(session, chat.id, "rules", "")
 
-    await message.answer("✅ Rules deleted.")
+    await message.answer("✅ Правила удалены.")
