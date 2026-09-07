@@ -11,6 +11,7 @@ from db.queries import (
     delete_scheduled_post,
     get_scheduled_posts,
     get_or_create_chat,
+    update_scheduled_post,
 )
 from filters.admin import HasRank
 from filters.chat_type import IsGroup
@@ -50,13 +51,20 @@ async def cmd_schedule(message: Message, state: FSMContext) -> None:
     await state.set_state(ScheduleState.waiting_text)
 
 
+_MAX_SCHEDULE_TEXT = 2000
+
+
 @router.message(ScheduleState.waiting_text)
 async def on_schedule_text(message: Message, state: FSMContext) -> None:
     lang = await get_user_lang(message)
     if message.text and message.text == t("skip", lang):
         await state.update_data(text="")
     else:
-        await state.update_data(text=message.text or "")
+        text = message.text or ""
+        if len(text) > _MAX_SCHEDULE_TEXT:
+            await message.answer(f"❌ Text is too long (max {_MAX_SCHEDULE_TEXT} characters).")
+            return
+        await state.update_data(text=text)
 
     await message.answer(t("schedule_ask_photo", lang), reply_markup=_skip_kb(lang))
     await state.set_state(ScheduleState.waiting_photo)
@@ -170,3 +178,50 @@ async def cmd_schedule_del(message: Message) -> None:
         await message.answer(t("schedule_deleted", lang, id=post_id))
     else:
         await message.answer(t("schedule_not_found", lang, id=post_id))
+
+
+# ── /schedule_edit — Edit an existing scheduled post ─────────────────────────
+
+@router.message(Command("schedule_edit"), IsGroup(), HasRank(2))
+async def cmd_schedule_edit(message: Message) -> None:
+    """Edit scheduled post. Usage: /schedule_edit <id> text <new text> OR /schedule_edit <id> interval <hours>"""
+    lang = await get_user_lang(message)
+    args = message.text.removeprefix("/schedule_edit").strip().split(maxsplit=2)
+
+    if len(args) < 2:
+        await message.answer("Использование:\n/schedule_edit <id> text <новый текст>\n/schedule_edit <id> interval <часы>")
+        return
+
+    if not args[0].isdigit():
+        await message.answer("❌ ID должен быть числом.")
+        return
+
+    post_id = int(args[0])
+    field = args[1].lower()
+
+    if field == "text" and len(args) >= 3:
+        new_text = args[2]
+        if len(new_text) > _MAX_SCHEDULE_TEXT:
+            await message.answer(f"❌ Текст слишком длинный (макс. {_MAX_SCHEDULE_TEXT} символов).")
+            return
+        async with async_session_factory() as session:
+            post = await update_scheduled_post(session, post_id, text=new_text)
+        if post and post.chat_telegram_id == message.chat.id:
+            await message.answer(f"✅ Пост #{post_id} обновлён. Новый текст: {new_text[:100]}...")
+        else:
+            await message.answer(f"❌ Пост #{post_id} не найден.")
+
+    elif field == "interval" and len(args) >= 3:
+        interval_str = args[2].strip().lower().replace("ч", "").replace("h", "")
+        if not interval_str.isdigit() or int(interval_str) < 1 or int(interval_str) > 24:
+            await message.answer("❌ Интервал: от 1 до 24 часов.")
+            return
+        interval = int(interval_str)
+        async with async_session_factory() as session:
+            post = await update_scheduled_post(session, post_id, interval_hours=interval)
+        if post and post.chat_telegram_id == message.chat.id:
+            await message.answer(f"✅ Пост #{post_id} обновлён. Интервал: каждые {interval}ч.")
+        else:
+            await message.answer(f"❌ Пост #{post_id} не найден.")
+    else:
+        await message.answer("Использование:\n/schedule_edit <id> text <новый текст>\n/schedule_edit <id> interval <часы>")

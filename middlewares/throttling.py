@@ -1,11 +1,15 @@
+import logging
 import time
 
 from aiogram import BaseMiddleware
+from aiogram import exceptions as aiogram_exceptions
 from aiogram.types import Message
 
 from typing import Optional
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ThrottlingMiddleware(BaseMiddleware):
@@ -42,7 +46,7 @@ class ThrottlingMiddleware(BaseMiddleware):
             member = await event.chat.get_member(event.from_user.id)
             if member.status in ("creator", "administrator"):
                 return await handler(event, data)
-        except Exception:
+        except (aiogram_exceptions.TelegramForbiddenError, aiogram_exceptions.TelegramBadRequest):
             pass
 
         chat_id = event.chat.id
@@ -67,7 +71,11 @@ class ThrottlingMiddleware(BaseMiddleware):
             # Too many messages in window
             try:
                 await event.delete()
-            except Exception:
+            except (aiogram_exceptions.TelegramBadRequest, aiogram_exceptions.TelegramForbiddenError):
+                pass
+            try:
+                await event.answer("⏳ Slow down — too many messages!")
+            except (aiogram_exceptions.TelegramBadRequest, aiogram_exceptions.TelegramForbiddenError):
                 pass
             return  # Drop the update — don't call handler
 
@@ -76,7 +84,11 @@ class ThrottlingMiddleware(BaseMiddleware):
         if len(recent) >= self.rate_limit:
             try:
                 await event.delete()
-            except Exception:
+            except (aiogram_exceptions.TelegramBadRequest, aiogram_exceptions.TelegramForbiddenError):
+                pass
+            try:
+                await event.answer("⏳ Slow down — please wait before sending another message.")
+            except (aiogram_exceptions.TelegramBadRequest, aiogram_exceptions.TelegramForbiddenError):
                 pass
             # Don't even store this attempt
             return

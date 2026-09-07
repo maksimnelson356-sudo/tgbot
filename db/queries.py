@@ -941,6 +941,25 @@ async def delete_scheduled_post(
     return True
 
 
+async def update_scheduled_post(
+    session: AsyncSession, post_id: int, **kwargs
+) -> Optional["ScheduledPost"]:
+    """Update fields of an existing scheduled post. Returns the updated post or None."""
+    from db.models import ScheduledPost
+    post = await session.get(ScheduledPost, post_id)
+    if post is None:
+        return None
+    changed = False
+    for key, value in kwargs.items():
+        if hasattr(post, key) and getattr(post, key) != value:
+            setattr(post, key, value)
+            changed = True
+    if changed:
+        await session.commit()
+        await session.refresh(post)
+    return post
+
+
 # ── Marriages ──────────────────────────────────────────────────────────
 
 async def get_marriage(

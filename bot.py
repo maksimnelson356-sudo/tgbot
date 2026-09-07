@@ -188,55 +188,96 @@ async def on_error(event) -> None:
 
 async def main() -> None:
     """Main entry point."""
+    import sys
+    import os
+
+    # Check .env file exists
+    if not os.path.exists(".env"):
+        logger.warning(".env file not found — using environment variables only")
+
+    # Validate critical settings
+    if not getattr(settings, "BOT_TOKEN", None):
+        logger.error("BOT_TOKEN is missing — aborting startup")
+        sys.exit(1)
+
+    if not getattr(settings, "DATABASE_URL", None):
+        logger.error("DATABASE_URL is missing — aborting startup")
+        sys.exit(1)
+
+    # Warn on optional but important settings
+    if not getattr(settings, "GOOGLE_API_KEY", None):
+        logger.warning("GOOGLE_API_KEY is missing — AI moderation and AI chat will be disabled")
+
+    if not getattr(settings, "TELETHON_API_ID", None) or not getattr(settings, "TELETHON_API_HASH", None):
+        logger.warning("TELETHON credentials missing — /zombies and member scanning will be disabled")
+
+    # Config status report
+    logger.info("=== Bot Configuration ===")
+    logger.info("BOT_TOKEN: %s", "SET" if settings.BOT_TOKEN else "MISSING")
+    logger.info("DATABASE_URL: %s", "SET" if settings.DATABASE_URL else "MISSING")
+    logger.info("GOOGLE_API_KEY: %s", "SET" if settings.GOOGLE_API_KEY else "MISSING (AI disabled)")
+    logger.info("TELETHON_API_ID: %s", "SET" if settings.TELETHON_API_ID else "MISSING")
+    logger.info("TELETHON_API_HASH: %s", "SET" if settings.TELETHON_API_HASH else "MISSING")
+    logger.info("OWNER_ID: %s", settings.OWNER_ID if settings.OWNER_ID else "NOT SET")
+    logger.info("LOG_LEVEL: %s", settings.LOG_LEVEL)
+    logger.info("==========================")
+
     logging.basicConfig(
         level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    # ── Auto-delete bot messages in groups (15s) ─────────────────────────
-    from aiogram.types import Message as _Msg
-    from utils.helpers import schedule_delete as _schedule_delete
+# ── Auto-delete bot messages in groups (15s) ─────────────────────────
+    try:
+        from aiogram.types import Message as _Msg
+        from utils.helpers import schedule_delete as _schedule_delete
 
-    _orig_answer = _Msg.answer
-    _orig_reply = _Msg.reply
-    _MEDIA_ATTRS = ("audio", "video", "photo", "animation", "document",
-                    "voice", "video_note", "sticker")
+        # Version check: verify Message class has expected attributes
+        if not hasattr(_Msg, 'answer') or not hasattr(_Msg, 'reply'):
+            raise AttributeError("Message class missing required methods")
 
-    def _should_auto_delete(result) -> bool:
-        return bool(
-            result and result.chat.type in ("group", "supergroup")
-            and not result.reply_markup
-            and not any(getattr(result, attr, None) for attr in _MEDIA_ATTRS)
-        )
+        _orig_answer = _Msg.answer
+        _orig_reply = _Msg.reply
+        _MEDIA_ATTRS = ("audio", "video", "photo", "animation", "document",
+                         "voice", "video_note", "sticker")
 
-    async def _auto_del_answer(self, *a, **kw):
-        # A handler may request a longer TTL via helpers.keep_next(msg, delay)
-        override = getattr(self, "_autodel_delay", None)
-        if override is not None:
-            try:
-                del self._autodel_delay
-            except AttributeError:
-                pass
-        result = await _orig_answer(self, *a, **kw)
-        if _should_auto_delete(result):
-            _schedule_delete(result, float(override) if override else 15.0)
-        return result
+        def _should_auto_delete(result) -> bool:
+            return bool(
+                result and result.chat.type in ("group", "supergroup")
+                and not result.reply_markup
+                and not any(getattr(result, attr, None) for attr in _MEDIA_ATTRS)
+            )
 
-    async def _auto_del_reply(self, *a, **kw):
-        override = getattr(self, "_autodel_delay", None)
-        if override is not None:
-            try:
-                del self._autodel_delay
-            except AttributeError:
-                pass
-        result = await _orig_reply(self, *a, **kw)
-        if _should_auto_delete(result):
-            _schedule_delete(result, float(override) if override else 15.0)
-        return result
+        async def _auto_del_answer(self, *a, **kw):
+            # A handler may request a longer TTL via helpers.keep_next(msg, delay)
+            override = getattr(self, "_autodel_delay", None)
+            if override is not None:
+                try:
+                    del self._autodel_delay
+                except AttributeError:
+                    pass
+            result = await _orig_answer(self, *a, **kw)
+            if _should_auto_delete(result):
+                _schedule_delete(result, float(override) if override else 15.0)
+            return result
 
-    _Msg.answer = _auto_del_answer
-    _Msg.reply = _auto_del_reply
-    logger.info("Auto-delete patched: bot messages in groups will expire in 15s")
+        async def _auto_del_reply(self, *a, **kw):
+            override = getattr(self, "_autodel_delay", None)
+            if override is not None:
+                try:
+                    del self._autodel_delay
+                except AttributeError:
+                    pass
+            result = await _orig_reply(self, *a, **kw)
+            if _should_auto_delete(result):
+                _schedule_delete(result, float(override) if override else 15.0)
+            return result
+
+        _Msg.answer = _auto_del_answer
+        _Msg.reply = _auto_del_reply
+        logger.info("Auto-delete patched: bot messages in groups will expire in 15s")
+    except Exception as e:
+        logger.warning("Auto-delete monkey-patch failed, bot will run without auto-delete: %s", e)
 
     bot = Bot(
         token=settings.BOT_TOKEN,
@@ -289,6 +330,7 @@ async def main() -> None:
     from handlers.profile import router as profile_router
     from handlers.remind import router as remind_router
     from handlers.xp import router as xp_router
+    from handlers.entertainment.inline import router as inline_router
 
     # ── Register middlewares ──────────────────────────────────────────────
     from middlewares.throttling import ThrottlingMiddleware
@@ -341,6 +383,7 @@ async def main() -> None:
     dp.include_router(relationships_router)
     dp.include_router(antispam_router)
     dp.include_router(moderation_router)
+    dp.include_router(inline_router)
 
     # Explicit allowed_updates: without message_reaction Telegram never
     # delivers reaction updates (default excludes them), killing the rep system.

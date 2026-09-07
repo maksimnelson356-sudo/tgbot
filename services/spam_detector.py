@@ -76,10 +76,13 @@ class SpamDetector:
 
             now = time.monotonic()
             user_msgs = self.recent_messages.get(user_id, [])
-            # Keep only last 10 seconds
-            user_msgs = [m for m in user_msgs if now - m[1] < 10]
+            # Keep only last 60 seconds (increased from 10)
+            user_msgs = [m for m in user_msgs if now - m[1] < 60]
             same_count = sum(1 for m in user_msgs if m[0] == text)
             user_msgs.append((text, now))
+            # Per-user cap: keep only last 100 messages
+            if len(user_msgs) > 100:
+                user_msgs = user_msgs[-100:]
             self.recent_messages[user_id] = user_msgs
             if same_count >= 3:
                 score += 0.7
@@ -88,6 +91,16 @@ class SpamDetector:
             # Prune user key if list is empty
             if not user_msgs:
                 self.recent_messages.pop(user_id, None)
+
+        # Global cap: limit total users tracked to 1000
+        if len(self.recent_messages) > 1000:
+            # Remove oldest user(s) based on earliest timestamp
+            oldest_users = sorted(
+                self.recent_messages.items(),
+                key=lambda x: x[1][0][1] if x[1] else float('inf')
+            )[:len(self.recent_messages) - 1000]
+            for user_id_to_remove, _ in oldest_users:
+                del self.recent_messages[user_id_to_remove]
 
         is_spam = score >= 0.5
         return SpamResult(

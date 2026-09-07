@@ -10,6 +10,9 @@ from db.base import async_session_factory
 from db.queries import add_chat_admin, get_or_create_chat, get_chat_admin_rank
 from db.queries import list_chat_admins, remove_chat_admin, set_chat_setting
 from db.queries import get_or_create_user, is_chat_admin_db
+from db.models import ActionLog
+from sqlalchemy import select, func
+import datetime
 from filters.admin import HasRank
 from filters.chat_type import IsGroup, IsReplyTo
 from utils.helpers import display_name, escape_html, keep_next, spawn
@@ -395,3 +398,263 @@ async def cmd_panel_dm(message: Message) -> None:
 
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
     await message.answer(t("panel_dm_title", lang), reply_markup=kb)
+
+
+# ── /logs — Action log dashboard ─────────────────────────────────────────────
+
+_LOGS_PER_PAGE = 10
+
+# In-memory pagination state: {chat_id: {"action_type": str, "days": int, "page": int}}
+_logs_state: dict[int, dict] = {}
+
+
+@router.message(Command("logs"), IsGroup(), HasRank(2))
+async def cmd_logs(message: Message) -> None:
+    """Show action logs with optional filters: /logs [action_type] [days] [page]"""
+    if message.from_user is None:
+        return
+
+    args = message.text.removeprefix("/logs").strip().split()
+    action_type = None
+    days = 7
+    page = 0
+
+    for arg in args:
+        if arg.isdigit():
+            if action_type is None and not arg.startswith("0"):
+                # Could be page or days — treat as days if <= 365
+                val = int(arg)
+                if val <= 365:
+                    days = val
+                else:
+                    page = max(0, (val // _LOGS_PER_PAGE) - 1)
+        elif arg.isalpha():
+            action_type = arg.lower()
+
+    # Save state for pagination
+    _logs_state[message.chat.id] = {
+        "action_type": action_type,
+        "days": days,
+        "page": page,
+    }
+
+    await _render_logs_page(message, action_type, days, page)
+
+
+async def _render_logs_page(message: Message, action_type: str | None, days: int, page: int) -> None:
+    """Fetch and render one page of logs."""
+    cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
+
+    async with async_session_factory() as session:
+        stmt = select(ActionLog).where(ActionLog.chat_id == message.chat.id, ActionLog.created_at >= cutoff)
+        if action_type:
+            stmt = stmt.where(ActionLog.action_type == action_type)
+        stmt = stmt.order_by(ActionLog.created_at.desc()).offset(page * _LOGS_PER_PAGE).limit(_LOGS_PER_PAGE)
+        result = await session.execute(stmt)
+        logs = list(result.scalars().all())
+
+        # Count total for pagination
+        count_stmt = select(func.count(ActionLog.id)).where(ActionLog.chat_id == message.chat.id, ActionLog.created_at >= cutoff)
+        if action_type:
+            count_stmt = count_stmt.where(ActionLog.action_type == action_type)
+        total = (await session.execute(count_stmt)).scalar() or 0
+
+    if not logs:
+        await message.answer(f"📋 Логов за {days} дн. не найдено.")
+        return
+
+    total_pages = max(1, (total + _LOGS_PER_PAGE - 1) // _LOGS_PER_PAGE)
+
+    action_labels = {
+        "warned": "⚠️ Предупреждение",
+        "muted": "🔇 Мут",
+        "unmuted": "🔊 Размут",
+        "banned": "🚫 Бан",
+        "unbanned": "✅ Разбан",
+        "joined": "👋 Вход",
+        "left": "🚪 Выход",
+        "deleted": "🗑 Удаление",
+    }
+
+    lines = [f"📋 <b>Логи</b> (стр. {page + 1}/{total_pages}, за {days} дн.):"]
+    for log in logs:
+        label = action_labels.get(log.action_type, log.action_type)
+        ts = log.created_at.strftime("%d.%m %H:%M") if log.created_at else "?"
+        user_ref = f"<code>{log.user_id}</code>"
+        admin_ref = f" (админ: <code>{log.admin_id}</code>)" if log.admin_id else ""
+        detail = f" — {log.details}" if log.details else ""
+        lines.append(f"• {ts} {label} → {user_ref}{admin_ref}{detail}")
+
+    await message.answer("\n".join(lines))
+
+
+@router.message(Command("logs_prev"), IsGroup(), HasRank(2))
+async def cmd_logs_prev(message: Message) -> None:
+    """Go to previous page of logs."""
+    state = _logs_state.get(message.chat.id)
+    if state and state["page"] > 0:
+        state["page"] -= 1
+        await _render_logs_page(message, state["action_type"], state["days"], state["page"])
+    else:
+        await message.answer("📋 Это первая страница.")
+
+
+@router.message(Command("logs_next"), IsGroup(), HasRank(2))
+async def cmd_logs_next(message: Message) -> None:
+    """Go to next page of logs."""
+    state = _logs_state.get(message.chat.id)
+    if state is None:
+        await message.answer("Сначала вызови /logs")
+        return
+    state["page"] += 1
+    await _render_logs_page(message, state["action_type"], state["days"], state["page"])
+
+
+# ── /addword /delword — Bad word list management ─────────────────────────────
+
+@router.message(Command("addword"), IsGroup(), HasRank(2))
+async def cmd_addword(message: Message) -> None:
+    """Add a word to the bad-words list. /addword <word>"""
+    word = message.text.removeprefix("/addword").strip().lower()
+    if not word:
+        await message.answer("Использование: /addword <слово>")
+        return
+
+    async with async_session_factory() as session:
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        settings = chat.settings or {}
+        bad_words = list(settings.get("bad_words", []))
+        if word in bad_words:
+            await message.answer(f"⚠️ Слово «{word}» уже в списке.")
+            return
+        bad_words.append(word)
+        await set_chat_setting(session, chat.id, "bad_words", bad_words)
+
+    await message.answer(f"✅ Слово «<b>{escape_html(word)}</b>» добавлено в чёрный список.")
+
+
+@router.message(Command("delword"), IsGroup(), HasRank(2))
+async def cmd_delword(message: Message) -> None:
+    """Remove a word from the bad-words list. /delword <word>"""
+    word = message.text.removeprefix("/delword").strip().lower()
+    if not word:
+        await message.answer("Использование: /delword <слово>")
+        return
+
+    async with async_session_factory() as session:
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        settings = chat.settings or {}
+        bad_words = list(settings.get("bad_words", []))
+        if word not in bad_words:
+            await message.answer(f"⚠️ Слова «{word}» нет в списке.")
+            return
+        bad_words.remove(word)
+        await set_chat_setting(session, chat.id, "bad_words", bad_words)
+
+    await message.answer(f"✅ Слово «<b>{escape_html(word)}</b>» удалено из чёрного списка.")
+
+
+@router.message(Command("badwords"), IsGroup(), HasRank(1))
+async def cmd_badwords(message: Message) -> None:
+    """List current bad words for this chat."""
+    async with async_session_factory() as session:
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        bad_words = (chat.settings or {}).get("bad_words", [])
+
+    if not bad_words:
+        await message.answer("📝 Чёрный список пуст.")
+        return
+    lines = [f"📝 <b>Чёрный список ({len(bad_words)}):</b>"]
+    for i, w in enumerate(bad_words, 1):
+        lines.append(f"{i}. {escape_html(w)}")
+    await message.answer("\n".join(lines))
+
+
+# ── /banhistory — Ban history for a user ──────────────────────────────────────
+
+@router.message(Command("banhistory"), IsGroup(), HasRank(2))
+async def cmd_banhistory(message: Message) -> None:
+    """Show ban history for a user. /banhistory [reply or @username]"""
+    target_user = None
+    if message.reply_to_message and message.reply_to_message.from_user:
+        target_user = message.reply_to_message.from_user
+    else:
+        args = message.text.removeprefix("/banhistory").strip()
+        if args.startswith("@"):
+            username = args.split()[0].lstrip("@")
+            async with async_session_factory() as session:
+                from sqlalchemy import select
+                from db.models import User as UserModel
+                stmt = select(UserModel).where(UserModel.username == username)
+                result = await session.execute(stmt)
+                row = result.scalar_one_or_none()
+                if row:
+                    target_user = type("obj", (), {"id": row.telegram_id, "first_name": row.first_name or username})()
+
+    if target_user is None:
+        await message.answer("Ответь на сообщение пользователя или укажи @username:\n/banhistory [@username]")
+        return
+
+    async with async_session_factory() as session:
+        from db.models import ActionLog as AL
+        stmt = (
+            select(AL)
+            .where(AL.user_id == target_user.id, AL.action_type == "banned")
+            .order_by(AL.created_at.desc())
+            .limit(20)
+        )
+        result = await session.execute(stmt)
+        bans = list(result.scalars().all())
+
+    if not bans:
+        await message.answer(f"📋 Нет записей о банах для <code>{target_user.id}</code>.")
+        return
+
+    lines = [f"📋 <b>История банов</b> — <code>{target_user.id}</code>:"]
+    for b in bans:
+        ts = b.created_at.strftime("%d.%m.%Y %H:%M") if b.created_at else "?"
+        admin_ref = f"админ: <code>{b.admin_id}</code>" if b.admin_id else "система"
+        detail = f" — {b.details}" if b.details else ""
+        lines.append(f"• {ts} | {admin_ref}{detail}")
+
+    await message.answer("\n".join(lines))
+
+
+# ── /setantispam /setslowmode — Anti-spam config commands ─────────────────────
+
+@router.message(Command("setantispam"), IsGroup(), HasRank(2))
+async def cmd_setantispam(message: Message) -> None:
+    """Toggle antispam on/off. /setantispam on|off"""
+    args = message.text.removeprefix("/setantispam").strip().lower()
+    if args not in ("on", "off", "вкл", "выкл"):
+        await message.answer("Использование: /setantispam on|off")
+        return
+
+    enabled = args in ("on", "вкл")
+
+    async with async_session_factory() as session:
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        await set_chat_setting(session, chat.id, "antispam_enabled", enabled)
+
+    status = "включён" if enabled else "выключен"
+    await message.answer(f"✅ Антиспам {status}.")
+
+
+@router.message(Command("setslowmode"), IsGroup(), HasRank(2))
+async def cmd_setslowmode(message: Message) -> None:
+    """Set slow mode delay in seconds. /setslowmode <seconds> (0 to disable)"""
+    args = message.text.removeprefix("/setslowmode").strip()
+    if not args.isdigit() or int(args) < 0 or int(args) > 300:
+        await message.answer("Использование: /setslowmode <секунды> (0-300, 0 = выключить)")
+        return
+
+    delay = int(args)
+
+    async with async_session_factory() as session:
+        chat = await get_or_create_chat(session, telegram_id=message.chat.id)
+        await set_chat_setting(session, chat.id, "slowmode_delay", delay)
+
+    if delay == 0:
+        await message.answer("✅ Медленный режим выключен.")
+    else:
+        await message.answer(f"✅ Медленный режим: <b>{delay} сек.</b>")

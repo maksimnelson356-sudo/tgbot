@@ -1,25 +1,27 @@
-import datetime
+import json
+import logging
 import re
 
+import aiohttp
 from aiogram import Router, F
-from aiogram.types import ChatPermissions, Message
+from aiogram import exceptions as aiogram_exceptions
+from aiogram.types import Message
 
 from db.base import async_session_factory
 from db.queries import (
-    add_warning,
     get_or_create_chat,
     get_or_create_user,
-    increment_warnings,
     log_action,
-    mute_member,
-    reset_warnings,
 )
+from handlers.protection.moderation_helpers import handle_warning, handle_media_moderation
 from filters.chat_type import IsGroup
 from services.content_filter import has_email, has_phone
 from services.spam_detector import spam_detector
 from utils.helpers import display_name, escape_html
 from utils.i18n import t
 from utils.lang_helper import get_user_lang
+
+logger = logging.getLogger(__name__)
 
 router = Router()
 router.name = "moderation"
@@ -137,7 +139,9 @@ async def moderate_message(message: Message) -> None:
         member = await message.chat.get_member(message.from_user.id)
         if member.status in ("creator", "administrator"):
             return
-    except Exception:
+    except aiogram_exceptions.TelegramForbiddenError:
+        return
+    except aiogram_exceptions.TelegramBadRequest:
         return
 
     async with async_session_factory() as session:
@@ -215,47 +219,21 @@ async def moderate_message(message: Message) -> None:
                         reason = escape_html(
                             f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
                         )
-                except Exception:
+                except (KeyError, IndexError, json.JSONDecodeError):
                     pass
+                except aiohttp.ClientError:
+                    pass
+                except Exception as e:
+                    logger.warning("AI moderation check failed: %s", e)
 
         if reason is not None:
             try:
                 await message.delete()
-            except Exception:
+            except aiogram_exceptions.TelegramBadRequest:
                 pass
 
-            await add_warning(session, chat.id, user.id, None, reason=reason)
-            warn_count = await increment_warnings(session, chat.id, user.id)
-            max_warnings = settings.get("max_warnings", 3)
-
-            mention = display_name(message.from_user)
-
-            if warn_count >= max_warnings:
-                mute_duration = settings.get("mute_duration", 900)
-                await mute_member(session, chat.id, user.id, mute_duration)
-                # Real Telegram restriction
-                try:
-                    until_date = datetime.datetime.now() + datetime.timedelta(seconds=mute_duration)
-                    await message.bot.restrict_chat_member(
-                        chat_id=message.chat.id,
-                        user_id=message.from_user.id,
-                        permissions=ChatPermissions(can_send_messages=False),
-                        until_date=until_date,
-                    )
-                except Exception:
-                    pass
-                await log_action(
-                    session, chat.id, user.id,
-                    "muted", details=f"Auto-mute: {warn_count}/{max_warnings} warnings",
-                )
-                await message.answer(t("mod_muted", lang, user=mention, count=warn_count, max=max_warnings, reason=reason))
-                await reset_warnings(session, chat.id, user.id)
-            else:
-                await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=max_warnings, reason=reason))
-
-            await log_action(
-                session, chat.id, user.id,
-                "warned", details=reason,
+            await handle_warning(
+                session, chat, user, message, reason, lang, settings
             )
 
 
@@ -270,7 +248,7 @@ async def moderate_filtered_media(message: Message) -> None:
         member = await message.chat.get_member(message.from_user.id)
         if member.status in ("creator", "administrator"):
             return
-    except Exception:
+    except (aiogram_exceptions.TelegramForbiddenError, aiogram_exceptions.TelegramBadRequest):
         return
 
     async with async_session_factory() as session:
@@ -282,35 +260,11 @@ async def moderate_filtered_media(message: Message) -> None:
         user = await get_or_create_user(session, telegram_id=message.from_user.id)
         lang = await get_user_lang(message)
 
-        try:
-            await message.delete()
-        except Exception:
-            pass
-        mention = display_name(message.from_user)
-        max_warnings = settings.get("max_warnings", 3)
-
         if not settings.get("moderation_enabled", True):
             return
-        await add_warning(session, chat.id, user.id, None, reason="Media blocked")
-        warn_count = await increment_warnings(session, chat.id, user.id)
-        if warn_count >= max_warnings:
-            mute_duration = settings.get("mute_duration", 900)
-            await mute_member(session, chat.id, user.id, mute_duration)
-            try:
-                until_date = datetime.datetime.now() + datetime.timedelta(seconds=mute_duration)
-                await message.bot.restrict_chat_member(
-                    chat_id=message.chat.id,
-                    user_id=message.from_user.id,
-                    permissions=ChatPermissions(can_send_messages=False),
-                    until_date=until_date,
-                )
-            except Exception:
-                pass
-            await message.answer(t("mod_muted", lang, user=mention, count=warn_count, max=max_warnings, reason=t("mod_media", lang)))
-            await reset_warnings(session, chat.id, user.id)
-        else:
-            await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=max_warnings, reason=t("mod_media", lang)))
-        await log_action(session, chat.id, user.id, "warned", details="Media blocked")
+        await handle_media_moderation(
+            session, chat, user, message, t("mod_media", lang), lang, settings
+        )
 
 
 @router.message(IsGroup(), F.photo | F.video | F.animation, ~F.text.startswith("/"))
@@ -323,7 +277,7 @@ async def moderate_nsfw_media(message: Message) -> None:
         member = await message.chat.get_member(message.from_user.id)
         if member.status in ("creator", "administrator"):
             return
-    except Exception:
+    except (aiogram_exceptions.TelegramForbiddenError, aiogram_exceptions.TelegramBadRequest):
         return
 
     async with async_session_factory() as session:
@@ -346,27 +300,17 @@ async def moderate_nsfw_media(message: Message) -> None:
             text_normalized = normalize_text(text)
             for word in _NSFW_WORDS:
                 if word.lower() in text or word.lower() in text_normalized:
-                    try:
-                        await message.delete()
-                    except Exception:
-                        pass
-                    await add_warning(session, chat.id, user.id, None, reason=f"NSFW caption: {word}")
-                    warn_count = await increment_warnings(session, chat.id, user.id)
-                    mention = display_name(message.from_user)
-                    await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=settings.get("max_warnings", 3), reason=f"NSFW: {word}"))
+                    await handle_media_moderation(
+                        session, chat, user, message, f"NSFW: {word}", lang, settings
+                    )
                     return
 
             # Check caption for NSFW domains
             for domain in _NSFW_DOMAINS:
                 if domain in text:
-                    try:
-                        await message.delete()
-                    except Exception:
-                        pass
-                    await add_warning(session, chat.id, user.id, None, reason=f"NSFW domain: {domain}")
-                    warn_count = await increment_warnings(session, chat.id, user.id)
-                    mention = display_name(message.from_user)
-                    await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=settings.get("max_warnings", 3), reason=f"NSFW link: {domain}"))
+                    await handle_media_moderation(
+                        session, chat, user, message, f"NSFW link: {domain}", lang, settings
+                    )
                     return
 
         # AI image analysis (Gemini Vision)
@@ -379,35 +323,12 @@ async def moderate_nsfw_media(message: Message) -> None:
                     reason = escape_html(
                         f"AI: {ai_result.get('category', 'violation')} — {ai_result.get('reason', '')}"
                     )
-                    try:
-                        await message.delete()
-                    except Exception:
-                        pass
-                    await add_warning(session, chat.id, user.id, None, reason=reason)
-                    warn_count = await increment_warnings(session, chat.id, user.id)
-                    max_warnings = settings.get("max_warnings", 3)
-                    mention = display_name(message.from_user)
-                    if warn_count >= max_warnings:
-                        mute_duration = settings.get("mute_duration", 900)
-                        await mute_member(session, chat.id, user.id, mute_duration)
-                        try:
-                            import datetime
-                            until_date = datetime.datetime.now() + datetime.timedelta(seconds=mute_duration)
-                            await message.bot.restrict_chat_member(
-                                chat_id=message.chat.id,
-                                user_id=message.from_user.id,
-                                permissions=ChatPermissions(can_send_messages=False),
-                                until_date=until_date,
-                            )
-                        except Exception:
-                            pass
-                        await message.answer(t("mod_muted", lang, user=mention, count=warn_count, max=max_warnings, reason=reason))
-                        await reset_warnings(session, chat.id, user.id)
-                    else:
-                        await message.answer(t("mod_warned", lang, user=mention, count=warn_count, max=max_warnings, reason=reason))
+                    await handle_media_moderation(
+                        session, chat, user, message, reason, lang, settings
+                    )
                     return
-            except Exception:
-                pass
+            except (KeyError, IndexError, json.JSONDecodeError, aiohttp.ClientError) as e:
+                logger.warning("AI photo moderation failed: %s", e)
 
 
 # Anti-forward handler (catches ALL forwarded messages)
@@ -420,7 +341,7 @@ async def moderate_forwarded(message: Message) -> None:
         member = await message.chat.get_member(message.from_user.id)
         if member.status in ("creator", "administrator"):
             return
-    except Exception:
+    except (aiogram_exceptions.TelegramForbiddenError, aiogram_exceptions.TelegramBadRequest):
         return
 
     async with async_session_factory() as session:
@@ -433,18 +354,12 @@ async def moderate_forwarded(message: Message) -> None:
 
         try:
             await message.delete()
-        except Exception:
+        except (aiogram_exceptions.TelegramBadRequest, aiogram_exceptions.TelegramForbiddenError):
             pass
 
-        await add_warning(session, chat.id, user.id, None, reason="Forwarded message blocked")
-        warn_count = await increment_warnings(session, chat.id, user.id)
-        mention = display_name(message.from_user)
-        max_warnings = (chat.settings or {}).get("max_warnings", 3)
-        await message.answer(t(
-            "mod_forward_warned", lang,
-            user=mention, count=warn_count, max=max_warnings,
-        ))
-        await log_action(session, chat.id, user.id, "warned", details="Forwarded message blocked")
+        await handle_warning(
+            session, chat, user, message, "Forwarded message blocked", lang, chat.settings or {}
+        )
 
 
 # NSFW-suggestive emoji often used in inappropriate stickers
@@ -473,7 +388,7 @@ async def moderate_nsfw_sticker(message: Message) -> None:
         member = await message.chat.get_member(message.from_user.id)
         if member.status in ("creator", "administrator"):
             return
-    except Exception:
+    except (aiogram_exceptions.TelegramForbiddenError, aiogram_exceptions.TelegramBadRequest):
         return
 
     lang = await get_user_lang(message)
@@ -511,47 +426,6 @@ async def moderate_nsfw_sticker(message: Message) -> None:
                     break
 
         if is_nsfw:
-            try:
-                await message.delete()
-            except Exception:
-                pass
-
-            await add_warning(
-                session, chat.id, user.id, None,
-                reason=f"NSFW sticker: {escape_html(sticker_emoji)}",
-            )
-            warn_count = await increment_warnings(session, chat.id, user.id)
-            max_warnings = settings.get("max_warnings", 3)
-
-            mention = display_name(message.from_user)
-
-            if warn_count >= max_warnings:
-                mute_duration = settings.get("mute_duration", 900)
-                await mute_member(session, chat.id, user.id, mute_duration)
-                try:
-                    until_date = datetime.datetime.now() + datetime.timedelta(seconds=mute_duration)
-                    await message.bot.restrict_chat_member(
-                        chat_id=message.chat.id,
-                        user_id=message.from_user.id,
-                        permissions=ChatPermissions(can_send_messages=False),
-                        until_date=until_date,
-                    )
-                except Exception:
-                    pass
-                await log_action(
-                    session, chat.id, user.id,
-                    "muted", details=f"Auto-mute: {warn_count}/{max_warnings} NSFW stickers",
-                )
-                await message.answer(
-                    t("mod_muted", lang, user=mention, count=warn_count, max=max_warnings, reason=f"NSFW sticker")
-                )
-                await reset_warnings(session, chat.id, user.id)
-            else:
-                await message.answer(
-                    t("mod_warned", lang, user=mention, count=warn_count, max=max_warnings, reason=f"NSFW sticker")
-                )
-
-            await log_action(
-                session, chat.id, user.id,
-                "warned", details=f"NSFW sticker: {sticker_emoji}",
+            await handle_media_moderation(
+                session, chat, user, message, f"NSFW sticker: {escape_html(sticker_emoji)}", lang, settings
             )

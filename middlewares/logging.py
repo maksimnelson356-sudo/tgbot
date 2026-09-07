@@ -106,9 +106,12 @@ class LoggingMiddleware(BaseMiddleware):
                         f"Текущий ранг: /rank",
                     )
             except Exception as e:
-                logger.warning("XP award failed: %s", e)
+                logger.exception("XP award failed")
 
-        spawn(_award(), name=f"xp_{user_pk}")
+        try:
+            spawn(_award(), name=f"xp_{user_pk}")
+        except Exception as e:
+            logger.exception("XP award spawn failed")
 
     async def _log_chat_member(self, event: ChatMemberUpdated) -> None:
         if event.from_user is None or event.chat is None:

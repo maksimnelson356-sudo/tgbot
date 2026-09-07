@@ -83,6 +83,21 @@ def create_challenge(chat_id: int, user_id: int) -> tuple[str, io.BytesIO]:
 
     Returns (answer text, image buffer).
     """
+    # Clean up expired captchas first
+    sweep_expired()
+    # Enforce max pending per chat (default 10)
+    # Count existing pending for this chat_id
+    chat_pending = [
+        key for key in _pending.keys()
+        if key[0] == chat_id
+    ]
+    if len(chat_pending) >= 10:
+        # Remove the oldest pending captcha for this chat
+        oldest_key = min(
+            chat_pending,
+            key=lambda k: _pending[k]["sent_at"]
+        )
+        del _pending[oldest_key]
     answer = generate_challenge()
     image = create_captcha_image(answer)
     _pending[(chat_id, user_id)] = {
@@ -101,6 +116,8 @@ def verify(chat_id: int, user_id: int, user_answer: str) -> Optional[bool]:
     - False if wrong (tracking attempts)
     - None if no pending CAPTCHA found
     """
+    # Auto-sweep expired on every verify call
+    sweep_expired()
     pending = _pending.get((chat_id, user_id))
     if pending is None:
         return None

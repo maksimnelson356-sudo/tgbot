@@ -19,13 +19,23 @@ _MIN_INTERVAL: float = 2.0
 _MAX_TRACKED_CHATS = 1000
 
 
+import time
+
+_MAX_CALL_AGE: float = 300.0  # 5 minutes — entries older than this are always pruned
+
+
 def _prune_last_calls(now: float) -> None:
-    """Drop stale per-chat markers once the dict grows large."""
-    if len(_last_call_times) <= _MAX_TRACKED_CHATS:
-        return
-    stale = [cid for cid, ts in _last_call_times.items() if now - ts >= _MIN_INTERVAL]
+    """Drop stale per-chat markers: time-bound cleanup + LRU eviction."""
+    # Prune entries older than _MAX_CALL_AGE (time-bound cleanup)
+    stale = [cid for cid, ts in _last_call_times.items() if now - ts >= _MAX_CALL_AGE]
     for cid in stale:
         _last_call_times.pop(cid, None)
+
+    # LRU eviction: if still over capacity, drop oldest entries
+    if len(_last_call_times) > _MAX_TRACKED_CHATS:
+        sorted_entries = sorted(_last_call_times.items(), key=lambda x: x[1])
+        for cid, _ in sorted_entries[:len(_last_call_times) - _MAX_TRACKED_CHATS]:
+            _last_call_times.pop(cid, None)
 
 _MODERATION_PROMPT = """You are a content moderation assistant for a Telegram group chat. Analyze the following content and determine if it violates Telegram's Terms of Service or the group's rules.
 
@@ -83,6 +93,9 @@ async def check_text(text: str, chat_id: int = 0) -> Optional[dict]:
                 text_out = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 text_out = text_out.removeprefix("```json").removesuffix("```").strip()
                 return json.loads(text_out)
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        logger.warning("Gemini text response parse error: %s", e)
+        return None
     except Exception as e:
         logger.warning("Gemini text check failed: %s", e)
         return None
@@ -100,6 +113,7 @@ async def check_photo(photo_bytes: bytes, mime_type: str = "image/jpeg", chat_id
     now = time.time()
     if now - _last_call_times.get(chat_id, 0) < _MIN_INTERVAL:
         return None
+    _prune_last_calls(now)
     _last_call_times[chat_id] = now
 
     b64 = base64.b64encode(photo_bytes).decode()
@@ -128,6 +142,9 @@ async def check_photo(photo_bytes: bytes, mime_type: str = "image/jpeg", chat_id
                 text_out = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 text_out = text_out.removeprefix("```json").removesuffix("```").strip()
                 return json.loads(text_out)
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        logger.warning("Gemini photo response parse error: %s", e)
+        return None
     except Exception as e:
         logger.warning("Gemini photo check failed: %s", e)
         return None
