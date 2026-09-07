@@ -75,7 +75,6 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="joke", description="Случайная шутка 😂"),
         BotCommand(command="fact", description="Случайный факт 🧠"),
         BotCommand(command="weather", description="Погода 🌤"),
-        BotCommand(command="feedback", description="Написать владельцу 💬"),
         BotCommand(command="birthdays", description="Дни рождения 🎉"),
         BotCommand(command="setbday", description="Установить дату рождения 🎂"),
     ]
@@ -110,7 +109,6 @@ async def set_bot_commands(bot: Bot) -> None:
         BotCommand(command="note", description="Добавить заметку 📝"),
         BotCommand(command="notes", description="Список заметок 📋"),
         BotCommand(command="delnote", description="Удалить заметку ❌"),
-        BotCommand(command="zombies", description="Очистить мёртвых 🧟"),
         BotCommand(command="bansticker", description="Забанить стикер 🚫"),
         BotCommand(command="setrules", description="Установить правила 📜"),
         BotCommand(command="delrules", description="Удалить правила 📜"),
@@ -161,10 +159,6 @@ async def on_startup(bot: Bot) -> None:
     from services.scheduler_service import start_scheduler
     start_scheduler(bot)
 
-    # Start Telethon client (for /zombies, member scanning)
-    from services.telethon_client import get_client
-    await get_client()
-
     # Start auto-unmute background task
     from handlers.protection.utilities import auto_unmute_check
     from utils.helpers import spawn
@@ -177,12 +171,10 @@ async def on_startup(bot: Bot) -> None:
 
 async def on_shutdown(bot: Bot) -> None:
     """Cleanup on shutdown."""
-    from services.telethon_client import stop_client
     from services.scheduler_service import stop_scheduler
     from utils.helpers import shutdown_background_tasks
     stop_scheduler()
     await shutdown_background_tasks()
-    await stop_client()
     logger.info("Bot shutting down...")
 
 
@@ -217,17 +209,11 @@ async def main() -> None:
     if not getattr(settings, "GOOGLE_API_KEY", None):
         logger.warning("GOOGLE_API_KEY is missing — AI moderation and AI chat will be disabled")
 
-    if not getattr(settings, "TELETHON_API_ID", None) or not getattr(settings, "TELETHON_API_HASH", None):
-        logger.warning("TELETHON credentials missing — /zombies and member scanning will be disabled")
-
     # Config status report
     logger.info("=== Bot Configuration ===")
     logger.info("BOT_TOKEN: %s", "SET" if settings.BOT_TOKEN else "MISSING")
     logger.info("DATABASE_URL: %s", "SET" if settings.DATABASE_URL else "MISSING")
     logger.info("GOOGLE_API_KEY: %s", "SET" if settings.GOOGLE_API_KEY else "MISSING (AI disabled)")
-    logger.info("TELETHON_API_ID: %s", "SET" if settings.TELETHON_API_ID else "MISSING")
-    logger.info("TELETHON_API_HASH: %s", "SET" if settings.TELETHON_API_HASH else "MISSING")
-    logger.info("OWNER_ID: %s", settings.OWNER_ID if settings.OWNER_ID else "NOT SET")
     logger.info("LOG_LEVEL: %s", settings.LOG_LEVEL)
     logger.info("==========================")
 
@@ -322,14 +308,12 @@ async def main() -> None:
     from handlers.protection.reputation import router as reputation_router
     from handlers.protection.bansticker import router as bansticker_router
     from handlers.protection.rules import router as rules_router
-    from handlers.protection.zombies import router as zombies_router
     from handlers.protection.autoresponder import router as autoresponder_router
     from handlers.protection.slowmode_cmd import router as slowmode_cmd_router
     from handlers.protection.stats_daily import router as stats_daily_router
     from handlers.protection.birthdays import router as birthdays_router
     from handlers.entertainment.weather import router as weather_router
     from handlers.entertainment.music import router as music_router
-    from handlers.feedback import router as feedback_router
     from handlers.protection.setlog import router as setlog_router
     from handlers.protection.utilities import router as utilities_router
     from handlers.protection.scheduler import router as scheduler_router
@@ -375,13 +359,11 @@ async def main() -> None:
     dp.include_router(reputation_router)
     dp.include_router(bansticker_router)
     dp.include_router(rules_router)
-    dp.include_router(zombies_router)
     dp.include_router(autoresponder_router)
     dp.include_router(slowmode_cmd_router)
     dp.include_router(stats_daily_router)
     dp.include_router(birthdays_router)
     dp.include_router(weather_router)
-    dp.include_router(feedback_router)
     dp.include_router(setlog_router)
     dp.include_router(utilities_router)
     dp.include_router(scheduler_router)

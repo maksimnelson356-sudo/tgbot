@@ -22,7 +22,7 @@ cd /opt/tgbot && source venv/bin/activate && python bot.py
 pip install -r requirements.txt
 ```
 
-Key packages: aiogram 3.18+, SQLAlchemy 2.0 (async), aiosqlite, pydantic-settings, Pillow, beautifulsoup4, telethon, yt-dlp
+Key packages: aiogram 3.18+, SQLAlchemy 2.0 (async), aiosqlite, pydantic-settings, Pillow, beautifulsoup4, yt-dlp
 
 ## Architecture
 
@@ -61,9 +61,8 @@ The bot uses aiogram's `Dispatcher` with multiple routers. **Router registration
 ### Configuration (`config.py`)
 
 Uses `pydantic-settings` with `.env` file. Key settings:
-- `BOT_TOKEN`, `OWNER_ID` (for /feedback)
+- `BOT_TOKEN`
 - `GOOGLE_API_KEY` (AI moderation/chat via Google Gemini)
-- `TELETHON_API_ID`/`TELETHON_API_HASH` (member scanning, /zombies)
 - Throttling, captcha, raid, and warning limits (all configurable)
 
 ### Admin Rank System

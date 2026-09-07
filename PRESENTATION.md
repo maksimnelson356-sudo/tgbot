@@ -63,10 +63,6 @@ This is a multifunctional Telegram bot designed for group moderation and enterta
 ```
 BOT_TOKEN=your_telegram_bot_token
 GOOGLE_API_KEY=your_google_ai_studio_key
-OWNER_ID=your_telegram_id_for_feedback
-TELETHON_API_ID=your_telethon_api_id
-TELETHON_API_HASH=your_telethon_api_hash
-TELETHON_SESSION=tgbot_userbot
 DATABASE_URL=sqlite+aiosqlite:///data/tgbot.db
 LOG_LEVEL=INFO
 ```

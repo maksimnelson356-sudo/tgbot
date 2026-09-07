@@ -39,16 +39,8 @@ class Settings(BaseSettings):
     BOT_USERNAME: str = ""
     BOT_LANGUAGE: str = "ru"
 
-    # Bot owner (used for /feedback)
-    OWNER_ID: int = 0
-
     # AI moderation
     GOOGLE_API_KEY: str = ""
-
-    # Telethon (for member scanning, /zombies, etc.)
-    TELETHON_API_ID: int = 0
-    TELETHON_API_HASH: str = ""
-    TELETHON_SESSION: str = "tgbot_userbot"
 
 
 settings = Settings()  # type: ignore[call-arg]

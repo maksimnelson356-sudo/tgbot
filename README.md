@@ -26,9 +26,6 @@ git push origin main
 ```env
 BOT_TOKEN=...
 GOOGLE_API_KEY=...      # для AI-модерации и AI-чата
-OWNER_ID=123456789      # для /feedback
-TELETHON_API_ID=...     # для /zombies
-TELETHON_API_HASH=...
 ```
 
 ## Структура проекта

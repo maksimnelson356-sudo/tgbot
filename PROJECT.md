@@ -24,12 +24,11 @@ git push origin main
 ```
 BOT_TOKEN=...
 GOOGLE_API_KEY=AIza... или AQ....  ← ключ Google AI Studio
-OWNER_ID=<telegram_id>   ← для /feedback, узнать через @userinfobot
 ```
 
 ## Ключевые файлы
 - `bot.py` — точка входа, порядок роутеров
-- `config.py` — настройки (pydantic-settings, .env), OWNER_ID
+- `config.py` — настройки (pydantic-settings, .env)
 - `handlers/protection/admin_panel.py` — панель админа (Inlinekbd, /panel)
 - `handlers/protection/warnings.py` — Пред/Мут/Бан + /warn /mute /ban
 - `handlers/protection/captcha_handler.py` — капча для новых участников
@@ -41,7 +40,6 @@ OWNER_ID=<telegram_id>   ← для /feedback, узнать через @userinfo
 - `handlers/entertainment/music.py` — поиск и воспроизведение музыки (Hitmo)
 - `handlers/entertainment/fun.py` — /dice /flip /coin /8ball
 - `handlers/language.py` — /language ru|en
-- `handlers/feedback.py` — /feedback → OWNER_ID
 - `handlers/info.py` — /start /help /rules /id /me
 - `handlers/scheduler.py` — отложенные посты
 - `services/music_service.py` — Hitmo HTML-парсер, кэш
